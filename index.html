@@ -1295,58 +1295,59 @@
 
     function getDefaultAgents() {
       const raw = [
-        { empId: '234', name: 'Khaled El Sabban', email: 'khaled.elsabban@tempo.fit', dept: 'Operation Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-06-23', usedDays: 10, isExceptional: true, tenureGroup: 'Old' },
-        { empId: '530', name: 'Job James', email: 'job.james@tempo.fit', dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 3, tenureGroup: 'Old' },
-        { empId: '218', name: 'Ahmed Elsawy', email: 'ahmed.elsawy@tempo.fit', dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7, tenureGroup: 'Old' },
+        { empId: '234', name: 'Khaled El Sabban', email: 'khaledsabban@tempo.fit', emailAliases: ['khaled.elsabban@tempo.fit', 'elsabban@tempo.fit', 'sabban@tempo.fit'], dept: 'Operation Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-06-23', usedDays: 10, isExceptional: true, tenureGroup: 'Old' },
+        { empId: '530', name: 'Job James', email: 'job.james@tempo.fit', emailAliases: ['job@tempo.fit', 'james@tempo.fit'], dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 3, tenureGroup: 'Old' },
+        { empId: '218', name: 'Ahmed Elsawy', email: 'ahmed.elsawy@tempo.fit', emailAliases: ['sawy@tempo.fit', 'elsawy@tempo.fit'], dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7, tenureGroup: 'Old' },
         { empId: '209', name: 'Ahmed Mahmoud', email: 'ahmed.mahmoud@tempo.fit', dept: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7, tenureGroup: 'Old' },
-        { empId: '224', name: 'Lina Hesham', email: 'lina.hesham@tempo.fit', dept: 'Social', supervisor: 'Mohamed Mounir', joinDate: '2024-06-03', usedDays: 8, tenureGroup: 'Old' },
-        { empId: '531', name: 'Ariath Piol', email: 'ariath.piol@tempo.fit', dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 8, tenureGroup: 'Old' },
-        { empId: '805', name: 'Rima Zaki', email: 'rima.zaki@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2023-11-13', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '180', name: 'Mohamed Mounir', email: 'mohamed.mounir@tempo.fit', dept: 'Change Integration Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-04-05', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '832', name: 'Ahmed Abdelghany', email: 'ahmed.abdelghany@tempo.fit', dept: 'QA', supervisor: 'Heba El Sobky', joinDate: '2024-08-05', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '476', name: 'Hassan Khallaf', email: 'hassan.khallaf@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-03-07', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '174', name: 'Mohab Magdy', email: 'mohab.magdy@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2021-04-05', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '792', name: 'Rashad Mohamed', email: 'rashad.mohamed@tempo.fit', dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-03-13', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '522', name: 'Mostafa Adel', email: 'mostafa.adel@tempo.fit', dept: 'Workforce Analyst', supervisor: 'Mohamed Halim', joinDate: '2022-07-25', usedDays: 10, accessRole: 'admin', tenureGroup: 'Old' },
-        { empId: '212', name: 'Marwa Ahmed', email: 'marwa.ahmed@tempo.fit', dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 11, tenureGroup: 'Old' },
-        { empId: '808', name: 'Noha Radwan', email: 'noha.radwan@tempo.fit', dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-11-13', usedDays: 11, tenureGroup: 'Old' },
-        { empId: '705', name: 'Fatma Mohammed', email: 'fatma.mohammed@tempo.fit', dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2022-11-21', usedDays: 11, tenureGroup: 'Old' },
-        { empId: '876', name: 'Andrew Osama Khalil', email: 'andrew.khalil@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-06-08', usedDays: 1, tenureGroup: 'Old' },
-        { empId: '880', name: 'Ammar Ahmed', email: 'ammar.ahmed@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-07-06', usedDays: 0, tenureGroup: 'Old' },
-        { empId: '878', name: 'Mostafa Ashraf', email: 'mostafa.ashraf@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 0, tenureGroup: 'Old' },
-        { empId: '194', name: 'Heba El Sobky', email: 'heba.elsobky@tempo.fit', dept: 'QA Lead', supervisor: 'Nancy Elsharony', joinDate: '2021-06-21', usedDays: 13, tenureGroup: 'Old' },
-        { empId: '755', name: 'Aida Clement', email: 'aida.clement@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2023-02-06', usedDays: 13, tenureGroup: 'Old' },
-        { empId: '889', name: 'Mohamed Faheem', email: 'mohamed.faheem@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 1, tenureGroup: 'Old' },
-        { empId: '873', name: 'Salma Atef', email: 'salma.atef@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 4, tenureGroup: 'Old' },
+        { empId: '224', name: 'Lina Hesham', email: 'linahesham@tempo.fit', emailAliases: ['lina.hesham@tempo.fit', 'lina@tempo.fit', 'hesham@tempo.fit'], dept: 'Social', supervisor: 'Mohamed Mounir', joinDate: '2024-06-03', usedDays: 8, tenureGroup: 'Old' },
+        { empId: '531', name: 'Ariath Piol', email: 'ariath.piol@tempo.fit', emailAliases: ['ariath@tempo.fit', 'piol@tempo.fit'], dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 8, tenureGroup: 'Old' },
+        { empId: '805', name: 'Rima Zaki', email: 'rima.khaled@tempo.fit', emailAliases: ['rima.zaki@tempo.fit', 'rima@tempo.fit', 'zaki@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2023-11-13', usedDays: 9, tenureGroup: 'Old' },
+        { empId: '180', name: 'Mohamed Mounir', email: 'mohamed.abdelmagid@tempo.fit', emailAliases: ['mohamed.mounir@tempo.fit', 'mounir@tempo.fit'], dept: 'Change Integration Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-04-05', usedDays: 9, tenureGroup: 'Old' },
+        { empId: '832', name: 'Ahmed Abdelghany', email: 'ahmed.abdelghany@tempo.fit', emailAliases: ['abdelghany@tempo.fit'], dept: 'QA', supervisor: 'Heba El Sobky', joinDate: '2024-08-05', usedDays: 9, tenureGroup: 'Old' },
+        { empId: '476', name: 'Hassan Khallaf', email: 'hassan@tempo.fit', emailAliases: ['hassan.khallaf@tempo.fit', 'khallaf@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-03-07', usedDays: 9, tenureGroup: 'Old' },
+        { empId: '174', name: 'Mohab Magdy', email: 'mohab.magdy@tempo.fit', emailAliases: ['mohab@tempo.fit', 'magdy@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2021-04-05', usedDays: 9, tenureGroup: 'Old' },
+        { empId: '792', name: 'Rashad Mohamed', email: 'rashad.mohamed@tempo.fit', emailAliases: ['rashad@tempo.fit'], dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-03-13', usedDays: 9, tenureGroup: 'Old' },
+        { empId: '522', name: 'Mostafa Adel', email: 'mostafa.adel@tempo.fit', emailAliases: ['adel@tempo.fit'], dept: 'Workforce Analyst', supervisor: 'Mohamed Halim', joinDate: '2022-07-25', usedDays: 10, accessRole: 'admin', tenureGroup: 'Old' },
+        { empId: '212', name: 'Marwa Ahmed', email: 'marwa.ahmed@tempo.fit', emailAliases: ['marwa@tempo.fit'], dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 11, tenureGroup: 'Old' },
+        { empId: '808', name: 'Noha Radwan', email: 'noha.radwan@tempo.fit', emailAliases: ['noha@tempo.fit', 'radwan@tempo.fit'], dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-11-13', usedDays: 11, tenureGroup: 'Old' },
+        { empId: '705', name: 'Fatma Mohammed', email: 'fatma.mohammad@tempo.fit', emailAliases: ['fatma.mohammed@tempo.fit', 'fatma@tempo.fit'], dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2022-11-21', usedDays: 11, tenureGroup: 'Old' },
+        { empId: '876', name: 'Andrew Osama Khalil', email: 'andrew.khalil@tempo.fit', emailAliases: ['andrew@tempo.fit', 'khalil@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-06-08', usedDays: 1, tenureGroup: 'Old' },
+        { empId: '880', name: 'Ammar Ahmed', email: 'ammar.ahmed@tempo.fit', emailAliases: ['ammar@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-07-06', usedDays: 0, tenureGroup: 'Old' },
+        { empId: '878', name: 'Mostafa Ashraf', email: 'mostafa.abdelrahim@tempo.fit', emailAliases: ['mostafa.ashraf@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 0, tenureGroup: 'Old' },
+        { empId: '194', name: 'Heba El Sobky', email: 'hebasobky@tempo.fit', emailAliases: ['heba.elsobky@tempo.fit', 'sobky@tempo.fit', 'elsobky@tempo.fit', 'heba@tempo.fit'], dept: 'QA Lead', supervisor: 'Nancy Elsharony', joinDate: '2021-06-21', usedDays: 13, tenureGroup: 'Old' },
+        { empId: '755', name: 'Aida Clement', email: 'aida.clement@tempo.fit', emailAliases: ['aida@tempo.fit', 'clement@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2023-02-06', usedDays: 13, tenureGroup: 'Old' },
+        { empId: '889', name: 'Mohamed Faheem', email: 'mohamed.faheem@tempo.fit', emailAliases: ['faheem@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 1, tenureGroup: 'Old' },
+        { empId: '873', name: 'Salma Atef', email: 'salma.atef@tempo.fit', emailAliases: ['atef@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 4, tenureGroup: 'Old' },
         { empId: '787', name: 'Khaled Ahmed', email: 'khaled.ahmed@tempo.fit', dept: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2023-03-13', usedDays: 14, tenureGroup: 'Old' },
-        { empId: '401', name: 'Mohamed Halim', email: 'mohamed.halim@tempo.fit', dept: 'Workforce Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-09-01', usedDays: 14, tenureGroup: 'Old' },
-        { empId: '850', name: 'Ashraf Essam', email: 'ashraf.essam@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-01-20', usedDays: 14, tenureGroup: 'Old' },
-        { empId: '869', name: 'Stephan Radu Onose', email: 'stephan.onose@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 5, tenureGroup: 'Old' },
-        { empId: '865', name: 'Mostafa Mohamed Hosny', email: 'mostafa.hosny@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 5, tenureGroup: 'Old' },
-        { empId: '851', name: 'Hala Ayman', email: 'hala.ayman@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-07-14', usedDays: 12, tenureGroup: 'Old' },
-        { empId: '868', name: 'Abdelrahman Fathy', email: 'abdelrahman.fathy@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 6, tenureGroup: 'Old' },
-        { empId: '816', name: 'Hagar Alaa', email: 'hagar.alaa@tempo.fit', dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2024-04-29', usedDays: 16, tenureGroup: 'Old' },
-        { empId: '882', name: 'Ibrahem Mohamed Mosbah', email: 'ibrahem.mosbah@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 4, tenureGroup: 'Old' },
-        { empId: '467', name: 'Emad Mohamed', email: 'emad.mohamed@tempo.fit', dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2021-11-15', usedDays: 18, tenureGroup: 'Old' },
-        { empId: '523', name: 'Nada Ashraf', email: 'nada.ashraf@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-07-25', usedDays: 18, tenureGroup: 'Old' },
-        { empId: '861', name: 'Shahd Emad', email: 'shahd.emad@tempo.fit', dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2025-08-11', usedDays: 20, tenureGroup: 'Old' },
-        { empId: '901', name: 'Mohra Khaled', email: 'mohra.khaled@tempo.fit', dept: 'Realtime Analyst', supervisor: 'Mohamed Halim', joinDate: '2026-09-14', usedDays: 0, tenureGroup: 'New' },
-        { empId: '902', name: 'Ruben Joseph', email: 'ruben.joseph@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '903', name: 'Yussif Zayed', email: 'yussif.zayed@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '906', name: 'Howida Mattar', email: 'howida.mattar@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '907', name: 'Rowan Ashour', email: 'rowan.ashour@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '908', name: 'Amr El Torgman', email: 'amr.eltorgman@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '401', name: 'Mohamed Halim', email: 'halim@tempo.fit', emailAliases: ['mohamed.halim@tempo.fit'], dept: 'Workforce Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-09-01', usedDays: 14, tenureGroup: 'Old' },
+        { empId: '850', name: 'Ashraf Essam', email: 'ashraf.essam@tempo.fit', emailAliases: ['ashraf@tempo.fit', 'essam@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-01-20', usedDays: 14, tenureGroup: 'Old' },
+        { empId: '869', name: 'Stephan Radu Onose', email: 'stephan.radu@tempo.fit', emailAliases: ['stephan.onose@tempo.fit', 'stephan@tempo.fit', 'onose@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 5, tenureGroup: 'Old' },
+        { empId: '865', name: 'Mostafa Mohamed Hosny', email: 'mostafa.hosny@tempo.fit', emailAliases: ['hosny@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 5, tenureGroup: 'Old' },
+        { empId: '851', name: 'Hala Ayman', email: 'hala.ayman@tempo.fit', emailAliases: ['hala@tempo.fit', 'ayman@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-07-14', usedDays: 12, tenureGroup: 'Old' },
+        { empId: '868', name: 'Abdelrahman Fathy', email: 'abdelrahman.fathy@tempo.fit', emailAliases: ['fathy@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 6, tenureGroup: 'Old' },
+        { empId: '816', name: 'Hagar Alaa', email: 'hagar.alaa@tempo.fit', emailAliases: ['hagar@tempo.fit', 'alaa@tempo.fit'], dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2024-04-29', usedDays: 16, tenureGroup: 'Old' },
+        { empId: '882', name: 'Ibrahem Mohamed Mosbah', email: 'ibrahe.mosbah@tempo.fit', emailAliases: ['ibrahem.mosbah@tempo.fit', 'ibrahem@tempo.fit', 'mosbah@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 4, tenureGroup: 'Old' },
+        { empId: '467', name: 'Emad Mohamed', email: 'emad.mohamed@tempo.fit', emailAliases: ['emad@tempo.fit'], dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2021-11-15', usedDays: 18, tenureGroup: 'Old' },
+        { empId: '523', name: 'Nada Ashraf', email: 'nada.ashraf@tempo.fit', emailAliases: ['nada@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-07-25', usedDays: 18, tenureGroup: 'Old' },
+        { empId: '861', name: 'Shahd Emad', email: 'shahd.emad@tempo.fit', emailAliases: ['shahd@tempo.fit'], dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2025-08-11', usedDays: 20, tenureGroup: 'Old' },
+        { empId: '901', name: 'Mohra Khaled', email: 'mohra.khaled@tempo.fit', emailAliases: ['mohra@tempo.fit'], dept: 'Realtime Analyst', supervisor: 'Mohamed Halim', joinDate: '2026-09-14', usedDays: 0, tenureGroup: 'New' },
+        { empId: '902', name: 'Ruben Joseph', email: 'ruben.joseph@tempo.fit', emailAliases: ['ruben@tempo.fit', 'joseph@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '903', name: 'Yussif Zayed', email: 'yussif.zayed@tempo.fit', emailAliases: ['yussif@tempo.fit', 'zayed@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '906', name: 'Howida Mattar', email: 'howida.mattar@tempo.fit', emailAliases: ['howida@tempo.fit', 'mattar@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '907', name: 'Rowan Ashour', email: 'rowan.ashour@tempo.fit', emailAliases: ['rowan@tempo.fit', 'ashour@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '908', name: 'Amr El Torgman', email: 'amr.eltorgman@tempo.fit', emailAliases: ['amr@tempo.fit', 'torgman@tempo.fit', 'eltorgman@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
         { empId: '909', name: 'Khaled Ahmed Abbas', email: 'khaled.abbas@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
         { empId: '910', name: 'Abdelrahman Amr', email: 'abdelrahman.amr@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '912', name: 'Mohamed Shebl', email: 'mohamed.shebl@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '913', name: 'Noureldin Mahmoud Hassan', email: 'noureldin.hassan@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '914', name: 'Ahmed Keshk', email: 'ahmed.keshk@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '912', name: 'Mohamed Shebl', email: 'mohamed.shebl@tempo.fit', emailAliases: ['shebl@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '913', name: 'Noureldin Mahmoud Hassan', email: 'noureldin.hassan@tempo.fit', emailAliases: ['noureldin@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '914', name: 'Ahmed Keshk', email: 'ahmed.keshk@tempo.fit', emailAliases: ['keshk@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
         { empId: '915', name: 'Ahmed Abbas', email: 'ahmed.abbas@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '917', name: 'Tarneem Elnaggar', email: 'tarneem.elnaggar@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '922', name: 'Alaa Mousa', email: 'alaa.mousa@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '917', name: 'Tarneem Elnaggar', email: 'tarneem.elnaggar@tempo.fit', emailAliases: ['tarneem@tempo.fit', 'elnaggar@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '922', name: 'Alaa Mousa', email: 'alaa.mousa@tempo.fit', emailAliases: ['mousa@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
         // Access-Only Accounts (No Annual Leave Balance)
-        { empId: '164', name: 'Nancy Elsharony', email: 'nancy.elsharony@tempo.fit', dept: 'Site Director', supervisor: '', joinDate: '2021-01-01', usedDays: 0, accessRole: 'admin', noLeaveBalance: true, tenureGroup: 'Old' },
-        { empId: '253', name: 'Salma Ramadan', email: 'salma.ramadan@tempo.fit', dept: 'HR Manager', supervisor: '', joinDate: '2022-01-01', usedDays: 0, accessRole: 'admin', noLeaveBalance: true, tenureGroup: 'Old' }
+        { empId: '164', name: 'Nancy Elsharony', email: 'nancy@tempo.fit', emailAliases: ['nancy.elsharony@tempo.fit', 'elsharony@tempo.fit'], dept: 'Site Director', supervisor: '', joinDate: '2021-01-01', usedDays: 0, accessRole: 'admin', noLeaveBalance: true, tenureGroup: 'Old' },
+        { empId: '253', name: 'Salma Ramadan', email: 'salmaramadan@tempo.fit', emailAliases: ['salma.ramadan@tempo.fit', 'salma@tempo.fit', 'ramadan@tempo.fit'], dept: 'HR Manager', supervisor: '', joinDate: '2022-01-01', usedDays: 0, accessRole: 'admin', noLeaveBalance: true, tenureGroup: 'Old' },
+        { empId: '260', name: 'Menna Yasser', email: 'menna@tempo.fit', emailAliases: ['menna.yasser@tempo.fit', 'yasser@tempo.fit'], dept: 'HR', supervisor: 'Salma Ramadan', joinDate: '2023-01-01', usedDays: 0, accessRole: 'agent', noLeaveBalance: true, tenureGroup: 'Old' }
       ];
 
       return raw.map((item, idx) => ({
@@ -1354,6 +1355,7 @@
         empId: item.empId,
         name: item.name,
         email: item.email,
+        emailAliases: item.emailAliases || [],
         dept: item.dept,
         supervisor: item.supervisor || '',
         joinDate: item.joinDate,
@@ -1371,13 +1373,73 @@
       }));
     }
 
+    function reconcileAndMigrateRoster(loadedList) {
+      const defaults = getDefaultAgents();
+      const defaultByEmpId = new Map(defaults.map(d => [String(d.empId), d]));
+      let changed = false;
+
+      // 1. Sync primary emails & emailAliases onto existing canonical records while preserving passwords & usage
+      loadedList.forEach(item => {
+        const def = defaultByEmpId.get(String(item.empId));
+        if (def) {
+          if (item.email !== def.email) {
+            item.email = def.email;
+            changed = true;
+          }
+          const mergedAliases = [...new Set([...(item.emailAliases || []), ...(def.emailAliases || [])])];
+          if (mergedAliases.length !== (item.emailAliases || []).length) {
+            item.emailAliases = mergedAliases;
+            changed = true;
+          }
+        }
+      });
+
+      // Ensure any new default users (like Menna Yasser #260) are present in saved storage
+      defaults.forEach(def => {
+        if (!loadedList.some(item => String(item.empId) === String(def.empId))) {
+          loadedList.push(def);
+          changed = true;
+        }
+      });
+
+      // 2. Auto-merge any previously auto-provisioned stub accounts (empId >= 923) into their real roster match
+      const stubs = loadedList.filter(a => Number(a.empId) >= 923 && a.joinDate === '2026-11-01' && a.tenureGroup === 'New');
+      if (stubs.length > 0) {
+        const nonStubs = loadedList.filter(a => !stubs.includes(a));
+        stubs.forEach(stub => {
+          const realTarget = matchUserInList(nonStubs, stub.email);
+          if (realTarget) {
+            if (stub.customPassword && !realTarget.customPassword) {
+              realTarget.customPassword = stub.customPassword;
+            }
+            const aliasEmail = String(stub.email || '').trim().toLowerCase();
+            if (aliasEmail && aliasEmail !== realTarget.email.toLowerCase()) {
+              realTarget.emailAliases = [...new Set([...(realTarget.emailAliases || []), aliasEmail])];
+            }
+            changed = true;
+          } else {
+            nonStubs.push(stub);
+          }
+        });
+        if (changed) {
+          saveAgents(nonStubs);
+          return nonStubs;
+        }
+      }
+
+      if (changed) {
+        saveAgents(loadedList);
+      }
+      return loadedList;
+    }
+
     function loadAgents() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            return reconcileAndMigrateRoster(parsed);
           }
         }
       } catch (err) {
@@ -1531,22 +1593,20 @@
       const displayName = localPart
         .split(/[._-]+/)
         .filter(Boolean)
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ') || 'Tempo Team Member';
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ') || 'Team Member';
 
-      const maxId = agents.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
-      const maxEmpNum = agents.reduce((m, a) => {
-        const num = parseInt(String(a.empId || '').replace(/\D/g, ''), 10);
-        return isNaN(num) ? m : Math.max(m, num);
-      }, 922);
+      const nextId = agents.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
+      const maxEmp = agents.reduce((m, a) => Math.max(m, Number(a.empId) || 922), 922);
 
       const newUser = {
-        id: maxId + 1,
-        empId: String(maxEmpNum + 1),
+        id: nextId,
+        empId: String(maxEmp + 1),
         name: displayName,
         email: clean,
+        emailAliases: [],
         dept: 'MX',
-        supervisor: '',
+        supervisor: 'Lina Hesham',
         joinDate: '2026-11-01',
         usedDays: 0,
         casualUsedDays: 0,
@@ -1566,10 +1626,45 @@
       return newUser;
     }
 
-    function findUserByEmail(email) {
+    function matchUserInList(list, email) {
       const clean = String(email || '').trim().toLowerCase();
       if (!clean) return null;
-      return agents.find(a => String(a.email || '').trim().toLowerCase() === clean) || null;
+
+      // 1. Exact primary email match
+      const exact = list.find(a => String(a.email || '').trim().toLowerCase() === clean);
+      if (exact) return exact;
+
+      // 2. Explicit emailAliases match (e.g., halim@tempo.fit -> Mohamed Halim #401)
+      const aliasMatch = list.find(a =>
+        Array.isArray(a.emailAliases) &&
+        a.emailAliases.some(al => String(al || '').trim().toLowerCase() === clean)
+      );
+      if (aliasMatch) return aliasMatch;
+
+      // 3. Smart single-token surname/unique-name match for @tempo.fit emails
+      if (isTempoEmail(clean)) {
+        const localPart = clean.split('@')[0].replace(/[^a-z0-9]/g, '');
+        if (localPart.length >= 3) {
+          const tokenMatches = list.filter(a => {
+            const nameTokens = String(a.name || '')
+              .toLowerCase()
+              .split(/\s+/)
+              .map(t => t.replace(/[^a-z0-9]/g, ''))
+              .filter(Boolean);
+            const joinedFull = nameTokens.join('');
+            return nameTokens.includes(localPart) || joinedFull === localPart;
+          });
+          if (tokenMatches.length === 1) {
+            return tokenMatches[0];
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function findUserByEmail(email) {
+      return matchUserInList(agents, email);
     }
 
     function isFirstTimeUser(user) {
