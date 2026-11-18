@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tempo Annual Leave Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: #404040;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-neutral-950 text-slate-800 dark:text-neutral-100 antialiased min-h-screen flex flex-col transition-colors duration-200">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white dark:bg-neutral-900 border-b border-slate-200 dark:border-neutral-800 sticky top-0 z-30 transition-colors duration-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shadow-sm">
+          <i class="fa-solid fa-calendar-check text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-xl font-bold text-slate-900 dark:text-white leading-tight">Tempo Annual Leave Tracker</h1>
+            <span id="role-mode-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700">
+              <i class="fa-solid fa-lock text-[9px]"></i>
+              <span id="role-mode-text">Sign In Required</span>
+            </span>
+          </div>
+          <p id="header-subtitle" class="text-xs text-slate-500 dark:text-neutral-400 hidden sm:block">Email-Authenticated Leave Balance Portal</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-2.5">
+        <!-- 2026 & 2027 Payout Schedule Reference Modal Trigger (Admin Only) -->
+        <button id="schedules-header-btn" onclick="openScheduleModal('2026')" class="hidden inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm" title="View Fixed 2026 &amp; 2027 Payout Schedules">
+          <i class="fa-solid fa-table-cells text-blue-200"></i>
+          <span class="hidden md:inline">Schedules (2026 / 2027)</span>
+        </button>
+
+        <!-- Light / Dark Mode Toggle -->
+        <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Light / Dark Mode"
+          class="inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-amber-400 border border-slate-200 dark:border-neutral-700 hover:bg-slate-200 dark:hover:bg-neutral-700 transition shadow-sm">
+          <i id="theme-toggle-icon" class="fa-solid fa-moon text-sm"></i>
+        </button>
+
+        <!-- Admin-Only Toolbar Group -->
+        <div id="admin-header-controls" class="hidden flex items-center gap-2 sm:gap-2.5">
+          <!-- Import from Google Sheets Button -->
+          <button onclick="openSheetsModal()" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
+            <i class="fa-solid fa-table text-blue-200"></i>
+            <span class="hidden sm:inline">Google Sheets Sync</span>
+          </button>
+
+          <!-- Export Dropdown Menu -->
+          <div class="relative" id="export-dropdown-wrapper">
+            <button onclick="toggleExportMenu(event)" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
+              <i class="fa-solid fa-file-export text-blue-200"></i>
+              <span class="hidden sm:inline">Export</span>
+              <i class="fa-solid fa-chevron-down text-[10px] text-blue-200"></i>
+            </button>
+
+            <div id="export-menu" class="hidden absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-700 shadow-xl py-1.5 z-40">
+              <button onclick="exportSummaryCSV(); closeExportMenu();" class="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-start gap-3 transition">
+                <i class="fa-solid fa-file-csv text-blue-600 dark:text-blue-400 mt-0.5"></i>
+                <div>
+                  <div class="text-xs font-semibold text-slate-900 dark:text-neutral-100">Export Summary CSV</div>
+                  <div class="text-[11px] text-slate-500 dark:text-neutral-400">Current filter view for Excel/Sheets</div>
+                </div>
+              </button>
+              <button onclick="exportDetailedLedgerCSV(); closeExportMenu();" class="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-start gap-3 transition">
+                <i class="fa-solid fa-table-list text-blue-600 dark:text-blue-400 mt-0.5"></i>
+                <div>
+                  <div class="text-xs font-semibold text-slate-900 dark:text-neutral-100">Export Milestone Ledger CSV</div>
+                  <div class="text-[11px] text-slate-500 dark:text-neutral-400">Full 1st-of-month breakdown</div>
+                </div>
+              </button>
+              <div class="my-1 border-t border-slate-100 dark:border-neutral-800"></div>
+              <button onclick="copyForGoogleSheets(); closeExportMenu();" class="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-start gap-3 transition">
+                <i class="fa-regular fa-copy text-slate-700 dark:text-neutral-300 mt-0.5"></i>
+                <div>
+                  <div class="text-xs font-semibold text-slate-900 dark:text-neutral-100">Copy for Google Sheets</div>
+                  <div class="text-[11px] text-slate-500 dark:text-neutral-400">One-click paste (Ctrl+V) into Sheet</div>
+                </div>
+              </button>
+              <button onclick="exportCredentialsCSV(); closeExportMenu();" class="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-start gap-3 transition">
+                <i class="fa-solid fa-envelope-circle-check text-amber-600 dark:text-amber-400 mt-0.5"></i>
+                <div>
+                  <div class="text-xs font-semibold text-slate-900 dark:text-neutral-100">Export Agent Emails &amp; Status CSV</div>
+                  <div class="text-[11px] text-slate-500 dark:text-neutral-400">Work emails &amp; password setup status</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Reset Roster Button -->
+          <button onclick="openResetConfirm()" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm" title="Reset to Default 49-Agent Roster">
+            <i class="fa-solid fa-rotate-left text-blue-200"></i>
+          </button>
+
+          <!-- Add Agent Button -->
+          <button onclick="openAgentModal()" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
+            <i class="fa-solid fa-user-plus"></i>
+            <span class="hidden sm:inline">Add Agent</span>
+          </button>
+        </div>
+
+        <!-- Sign Out Button (Visible when Admin or Agent is signed in) -->
+        <button id="sign-out-btn" onclick="signOutSession()" class="hidden inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-950 hover:bg-blue-900 border border-blue-800 rounded-xl transition shadow-sm">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 0: EMAIL SIGN-IN & 1st-TIME PASSWORD CREATION GATE               -->
+  <!-- ===================================================================== -->
+  <section id="login-gate-view" class="flex-1 flex items-center justify-center px-4 py-10">
+    <div class="w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-neutral-800 shadow-xl overflow-hidden">
+      <div class="p-6 sm:p-8 space-y-6">
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 rounded-2xl bg-blue-900 text-white flex items-center justify-center text-2xl mx-auto shadow-md">
+            <i id="login-header-icon" class="fa-solid fa-envelope-open-text"></i>
+          </div>
+          <h2 id="login-gate-title" class="text-xl font-bold text-slate-900 dark:text-white">Sign In to Tempo Annual Leave Tracker</h2>
+          <p id="login-gate-subtitle" class="text-xs sm:text-sm text-slate-500 dark:text-neutral-400">Enter your work email address to continue.</p>
+        </div>
+
+        <!-- Step 1: Role Selector + Email Sign-In Form -->
+        <div id="login-step-signin" class="space-y-5">
+          <!-- Role Selector Pills (Agent vs Admin) -->
+          <div class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700">
+            <button type="button" id="login-role-agent-btn" onclick="selectLoginRole('agent')"
+              class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-blue-900 text-white shadow-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user"></i>
+              <span>Agent Login</span>
+            </button>
+            <button type="button" id="login-role-admin-btn" onclick="selectLoginRole('admin')"
+              class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user-shield"></i>
+              <span>Admin Login</span>
+            </button>
+          </div>
+
+          <form onsubmit="handleUnifiedLogin(event)" class="space-y-4">
+            <div>
+              <label id="login-username-label" for="login-username-input" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                Agent Work Email
+              </label>
+              <div class="relative">
+                <i class="fa-solid fa-envelope text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm"></i>
+                <input type="email" id="login-username-input" required autocomplete="email"
+                  oninput="checkAgentFirstTimeEmailStatus()"
+                  placeholder="e.g., mostafa.hosny@tempo.com"
+                  class="w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+              </div>
+            </div>
+
+            <!-- Password field (shown for Admin or returning Agents who already created a password) -->
+            <div id="login-password-group">
+              <label for="login-password-input" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                Password
+              </label>
+              <div class="relative">
+                <i class="fa-solid fa-key text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm"></i>
+                <input type="password" id="login-password-input" autocomplete="current-password"
+                  placeholder="Enter your password..."
+                  class="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+                <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200" title="Show / Hide Password">
+                  <i id="login-pwd-eye-icon" class="fa-regular fa-eye text-xs"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- First-Time Login Banner when Agent has not set a password yet -->
+            <div id="first-time-detected-banner" class="hidden p-3 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+              <i class="fa-solid fa-sparkles text-blue-600 dark:text-blue-400 mt-0.5"></i>
+              <div>
+                <strong class="block">First-Time Sign-In Detected</strong>
+                <span>Click <strong>Continue to Create Password</strong> below to set your personal password for this email.</span>
+              </div>
+            </div>
+
+            <p id="login-error-msg" class="hidden text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2">
+              <i class="fa-solid fa-circle-exclamation mr-1"></i><span id="login-error-text">Invalid email or password.</span>
+            </p>
+
+            <button type="submit" class="w-full py-3 px-4 text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+              <i class="fa-solid fa-right-to-bracket"></i>
+              <span id="login-submit-text">Continue with Email</span>
+            </button>
+          </form>
+
+          <div id="login-hint-box" class="p-3.5 rounded-xl bg-slate-50 dark:bg-neutral-800/70 border border-slate-200 dark:border-neutral-700/80 text-xs text-slate-500 dark:text-neutral-400 space-y-1">
+            <div class="font-semibold text-slate-700 dark:text-neutral-300"><i class="fa-solid fa-circle-info text-blue-600 dark:text-blue-400 mr-1"></i>Email Sign-In &amp; First-Time Setup:</div>
+            <div id="login-hint-text">Sign in with your work email (e.g., <code class="font-mono text-slate-700 dark:text-neutral-200">mostafa.hosny@tempo.com</code>). On your <strong>1st login</strong>, you will immediately create your own personal password.</div>
+          </div>
+        </div>
+
+        <!-- Step 2: Mandatory First-Time Password Creation Form -->
+        <div id="login-step-create-pwd" class="hidden space-y-4">
+          <div class="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-user-check"></i>
+            </div>
+            <div class="min-w-0">
+              <div id="setup-agent-name" class="text-sm font-bold text-slate-900 dark:text-white truncate">Agent Name</div>
+              <div id="setup-agent-email" class="text-xs font-mono text-blue-800 dark:text-blue-300 truncate">agent@tempo.com</div>
+            </div>
+          </div>
+
+          <form onsubmit="handleFirstTimePasswordSetup(event)" class="space-y-4">
+            <div>
+              <label for="setup-new-password" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                Create Your New Password
+              </label>
+              <div class="relative">
+                <i class="fa-solid fa-lock text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm"></i>
+                <input type="password" id="setup-new-password" required minlength="6" autocomplete="new-password"
+                  placeholder="Minimum 6 characters..."
+                  class="w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+              </div>
+            </div>
+
+            <div>
+              <label for="setup-confirm-password" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                Confirm New Password
+              </label>
+              <div class="relative">
+                <i class="fa-solid fa-shield-halved text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm"></i>
+                <input type="password" id="setup-confirm-password" required minlength="6" autocomplete="new-password"
+                  placeholder="Re-enter your new password..."
+                  class="w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+              </div>
+            </div>
+
+            <p id="setup-pwd-error" class="hidden text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-xl px-3 py-2"></p>
+
+            <div class="flex items-center gap-2.5 pt-1">
+              <button type="button" onclick="cancelFirstTimePasswordSetup()"
+                class="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-neutral-300 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-xl transition">
+                Back
+              </button>
+              <button type="submit"
+                class="flex-1 py-2.5 px-4 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+                <i class="fa-solid fa-check-circle"></i>
+                <span>Save Password &amp; Sign In</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 1: AUTHENTICATED AGENT SELF-SERVICE PORTAL (OWN BALANCE ONLY)    -->
+  <!-- ===================================================================== -->
+  <section id="employee-portal-view" class="hidden flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <!-- Personal Employee Balance Card & Ledger -->
+    <div id="emp-personal-result" class="space-y-5">
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-neutral-800">
+          <div class="flex items-center gap-3.5">
+            <div id="emp-avatar-initials" class="w-12 h-12 rounded-2xl bg-blue-900 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-sm">
+              MK
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span id="emp-card-id" class="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700">#000</span>
+                <h3 id="emp-card-name" class="text-lg font-bold text-slate-900 dark:text-white">Employee Name</h3>
+                <span id="emp-card-eligibility"></span>
+              </div>
+              <p id="emp-card-meta" class="text-xs text-slate-500 dark:text-neutral-400 mt-1">LOB &bull; Supervisor &bull; Hired Date</p>
+            </div>
+          </div>
+
+          <button type="button" onclick="openChangeOwnPasswordModal()" class="self-start sm:self-auto inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
+            <i class="fa-solid fa-key text-[10px]"></i>
+            <span>Change Password</span>
+          </button>
+        </div>
+
+        <!-- Employee Milestone Switcher -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="inline-flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-neutral-800 p-1 rounded-xl border border-slate-200 dark:border-neutral-700">
+            <button type="button" id="emp-preset-today-btn" onclick="setEmployeeDatePreset('today')"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>Today (<span id="emp-preset-today-label">18 Nov 2026</span>)</span>
+            </button>
+            <button type="button" id="emp-preset-next-month-btn" onclick="setEmployeeDatePreset('next_month')"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+              <i class="fa-solid fa-forward-step text-[10px]"></i>
+              <span>1st of Next Month (<span id="emp-preset-next-month-label">01 Dec 2026</span>)</span>
+            </button>
+            <button type="button" id="emp-preset-2026-btn" onclick="setEmployeeDatePreset('full_2026')"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+              <i class="fa-solid fa-flag-checkered text-[10px]"></i>
+              <span>2026 EOY (<span id="emp-preset-2026-label">01 Jan 2027</span>)</span>
+            </button>
+            <button type="button" id="emp-preset-2027-btn" onclick="setEmployeeDatePreset('cycle_2027')"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+              <i class="fa-solid fa-calendar-plus text-[10px]"></i>
+              <span>2027 Reset (<span id="emp-preset-2027-label">01 Feb 2027</span>)</span>
+            </button>
+          </div>
+
+          <div id="emp-2027-milestone-wrap" class="hidden inline-flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700">
+            <label for="emp-2027-milestone-select" class="text-xs font-semibold text-neutral-700 dark:text-neutral-300">2027 Milestone:</label>
+            <select id="emp-2027-milestone-select" onchange="setCycle2027Month(this.value)"
+              class="text-xs font-semibold bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-100 border border-neutral-300 dark:border-neutral-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-700">
+              <option value="0">By 1-Feb 2027</option>
+              <option value="1">By 1-Mar 2027</option>
+              <option value="2">By 1-Apr 2027</option>
+              <option value="3">By 1-May 2027</option>
+              <option value="4">By 1-Jun 2027</option>
+              <option value="5">By 1-Jul 2027</option>
+              <option value="6">By 1-Aug 2027</option>
+              <option value="7">By 1-Sep 2027</option>
+              <option value="8">By 1-Oct 2027</option>
+              <option value="9">By 1-Nov 2027</option>
+              <option value="10">By 1-Dec 2027</option>
+              <option value="11">By 1-Jan 2028 (Full 2027)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 4 Personal Balance KPI Tiles -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1 tabular-nums">
+          <div class="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Remaining Balance</p>
+            <p id="emp-stat-remaining" class="text-2xl sm:text-3xl font-bold text-emerald-700 dark:text-emerald-300 mt-1">0</p>
+            <p id="emp-stat-remaining-note" class="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-1">Available days</p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-blue-800 dark:text-blue-300">Deserved / Accrued</p>
+            <p id="emp-stat-accrued" class="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300 mt-1">0</p>
+            <p id="emp-stat-payouts" class="text-[11px] text-blue-700/80 dark:text-blue-400/80 mt-1">0 payouts</p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-rose-800 dark:text-rose-300">Taken / Used</p>
+            <p id="emp-stat-taken" class="text-2xl sm:text-3xl font-bold text-rose-700 dark:text-rose-300 mt-1">0</p>
+            <p id="emp-stat-taken-note" class="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-1">Consumed leave days</p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 dark:bg-neutral-800/80 border border-slate-200 dark:border-neutral-700">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Current Rate</p>
+            <p id="emp-stat-rate" class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1">1.25</p>
+            <p id="emp-stat-rate-note" class="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">days / month</p>
+          </div>
+        </div>
+
+        <!-- Eligibility & Milestone Dates Strip -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+          <div class="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+            <span class="text-neutral-500 dark:text-neutral-400"><i class="fa-solid fa-calendar-day text-blue-500 mr-1.5"></i>First Accrual Payout</span>
+            <span id="emp-date-first-payout" class="font-bold text-neutral-800 dark:text-neutral-200">—</span>
+          </div>
+          <div class="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+            <span class="text-neutral-500 dark:text-neutral-400"><i class="fa-solid fa-hourglass-end text-amber-500 mr-1.5"></i>3-Mo Probation Unlock</span>
+            <span id="emp-date-probation" class="font-bold text-neutral-800 dark:text-neutral-200">—</span>
+          </div>
+          <div class="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+            <span class="text-neutral-500 dark:text-neutral-400"><i class="fa-solid fa-award text-emerald-500 mr-1.5"></i>1-Yr Anniversary (1.75/mo)</span>
+            <span id="emp-date-anniversary" class="font-bold text-neutral-800 dark:text-neutral-200">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Read-Only Personal Month-by-Month Payout Ledger -->
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white">Personal Month-by-Month Payout Ledger</h4>
+            <p id="emp-ledger-subtitle" class="text-xs text-slate-500 dark:text-neutral-400">Read-only breakdown of your monthly accrual milestones</p>
+          </div>
+          <span class="text-[11px] font-medium text-slate-400 dark:text-neutral-500"><i class="fa-solid fa-lock mr-1"></i>Read-Only</span>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-neutral-800">
+          <table class="w-full text-left border-collapse text-sm tabular-nums">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-neutral-800/70 border-b border-slate-200 dark:border-neutral-800 text-xs font-semibold uppercase text-slate-500 dark:text-neutral-400">
+                <th class="py-2.5 px-4">Milestone</th>
+                <th class="py-2.5 px-3">Applied Tier</th>
+                <th class="py-2.5 px-3 text-right">Accrued (+)</th>
+                <th class="py-2.5 px-3 text-right">Monthly Taken (-)</th>
+                <th class="py-2.5 px-4 text-right">Cumulative Accrued</th>
+              </tr>
+            </thead>
+            <tbody id="emp-ledger-tbody" class="divide-y divide-slate-100 dark:divide-neutral-800"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- VIEW 2: ADMIN DASHBOARD (HIDDEN UNTIL PASSWORD 'Tempo@2027' UNLOCKED)  -->
+  <!-- ===================================================================== -->
+  <main id="admin-dashboard-view" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Policy & Control Bar -->
+    <section class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors duration-200">
+      <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+        <span class="font-semibold text-slate-700 dark:text-neutral-200 mr-1"><i class="fa-solid fa-scale-balanced text-blue-600 dark:text-blue-400 mr-1.5"></i>1st-of-Month Policy:</span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-medium border border-blue-100 dark:border-blue-800/80">
+          &lt; 1 Yr: <strong>1.25/mo</strong> (15/yr)
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 font-medium border border-emerald-100 dark:border-emerald-800/80">
+          &ge; 1 Yr: <strong>1.75/mo</strong> (21/yr)
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 font-medium border border-purple-100 dark:border-purple-800/80">
+          Exceptional: <strong>2.50/mo</strong> (30/yr)
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800/80">
+          <i class="fa-solid fa-clock text-amber-500 dark:text-amber-400"></i> 1st of Next Mo (Late-Mo &gt;25th: +1 Mo) &bull; 3-Mo Probation
+        </span>
+      </div>
+
+      <!-- Quick Date Filter Buttons + Accrual Scope -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="inline-flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-neutral-800 p-1 rounded-xl border border-slate-200 dark:border-neutral-700">
+          <button type="button" id="preset-today-btn" onclick="setDatePreset('today')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Today (<span id="preset-today-label">18 Nov 2026</span>)</span>
+          </button>
+
+          <button type="button" id="preset-next-month-btn" onclick="setDatePreset('next_month')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+            <i class="fa-solid fa-forward-step text-[10px]"></i>
+            <span>1st of Next Month (<span id="preset-next-month-label">01 Dec 2026</span>)</span>
+          </button>
+
+          <button type="button" id="preset-2026-btn" onclick="setDatePreset('full_2026')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+            <i class="fa-solid fa-flag-checkered text-[10px]"></i>
+            <span>2026 (<span id="preset-2026-label">01 Jan 2027</span>)</span>
+          </button>
+
+          <button type="button" id="preset-2027-btn" onclick="setDatePreset('cycle_2027')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+            <i class="fa-solid fa-calendar-plus text-[10px]"></i>
+            <span>2027 (<span id="preset-2027-label">01 Feb 2027</span>)</span>
+          </button>
+        </div>
+
+        <!-- 2027 Milestone Selector -->
+        <div id="cycle-2027-milestone-wrap" class="hidden inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/80">
+          <label for="cycle-2027-milestone-select" class="text-xs font-semibold text-emerald-800 dark:text-emerald-300">2027 Milestone:</label>
+          <select id="cycle-2027-milestone-select" onchange="setCycle2027Month(this.value)"
+            class="text-xs font-semibold bg-white dark:bg-neutral-800 text-slate-800 dark:text-neutral-100 border border-emerald-300 dark:border-emerald-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-700">
+            <option value="0">By 1-Feb 2027</option>
+            <option value="1">By 1-Mar 2027</option>
+            <option value="2">By 1-Apr 2027</option>
+            <option value="3">By 1-May 2027</option>
+            <option value="4">By 1-Jun 2027</option>
+            <option value="5">By 1-Jul 2027</option>
+            <option value="6">By 1-Aug 2027</option>
+            <option value="7">By 1-Sep 2027</option>
+            <option value="8">By 1-Oct 2027</option>
+            <option value="9">By 1-Nov 2027</option>
+            <option value="10">By 1-Dec 2027</option>
+            <option value="11">By 1-Jan 2028 (Full 2027)</option>
+          </select>
+        </div>
+
+        <!-- Accrual Scope Toggle -->
+        <div id="accrual-scope-wrap" class="flex items-center gap-1.5 bg-slate-100 dark:bg-neutral-800 p-1 rounded-xl border border-slate-200 dark:border-neutral-700">
+          <button type="button" id="scope-ytd-btn" onclick="setAccrualScope('ytd')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition">
+            2026 Schedule
+          </button>
+          <button type="button" id="scope-cum-btn" onclick="setAccrualScope('cumulative')" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition">
+            Since Hire
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Summary KPI Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm flex items-start justify-between transition-colors duration-200">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Total Team Agents</p>
+          <p id="stat-total-agents" class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1">0</p>
+          <p id="stat-eligible-sub" class="text-xs text-slate-500 dark:text-neutral-400 mt-1.5">0 eligible &bull; 0 in probation</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 flex items-center justify-center">
+          <i class="fa-solid fa-users"></i>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm flex items-start justify-between transition-colors duration-200">
+        <div>
+          <p id="stat-accrued-label" class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Deserved / Accrued</p>
+          <p id="stat-total-accrued" class="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 mt-1">0.00</p>
+          <p class="text-xs text-slate-500 dark:text-neutral-400 mt-1.5">1st-of-month milestones</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm flex items-start justify-between transition-colors duration-200">
+        <div>
+          <p id="stat-used-label" class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Taken / Used Days</p>
+          <p id="stat-total-used" class="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 mt-1">0.00</p>
+          <p class="text-xs text-slate-500 dark:text-neutral-400 mt-1.5">Synced &amp; logged usage</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+          <i class="fa-solid fa-plane-departure"></i>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm flex items-start justify-between transition-colors duration-200">
+        <div>
+          <p id="stat-available-label" class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Remaining Balance</p>
+          <p id="stat-total-available" class="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">0.00</p>
+          <p id="stat-probation-held" class="text-xs text-slate-500 dark:text-neutral-400 mt-1.5">Net remaining days</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters & Roster Table -->
+    <section class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden transition-colors duration-200">
+      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-neutral-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <h2 class="text-base font-bold text-slate-900 dark:text-white">Agent Leave Roster</h2>
+          <span id="roster-count-badge" class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">0</span>
+          <button onclick="openScheduleModal('2026')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white bg-blue-900 hover:bg-blue-800 transition ml-1">
+            <i class="fa-solid fa-circle-info"></i><span>View Fixed Schedules</span>
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="relative flex-1 sm:flex-initial">
+            <i class="fa-solid fa-magnifying-glass text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 text-xs"></i>
+            <input type="text" id="search-input" oninput="renderDashboard()" placeholder="Search ID, name, email, LOB..."
+              class="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <select id="status-filter" onchange="renderDashboard()"
+            class="px-3 py-1.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700 text-slate-700 dark:text-neutral-200">
+            <option value="all">All Agents (52)</option>
+            <option value="new_hire">New Hires (14)</option>
+            <option value="old_staff">Existing Staff (38)</option>
+            <option value="eligible">Eligible (Post-Probation)</option>
+            <option value="probation">In Probation (&lt; 3 Mos)</option>
+            <option value="tier1">Standard &lt; 1 Yr (1.25/mo)</option>
+            <option value="tier2">Senior &ge; 1 Yr (1.75/mo)</option>
+            <option value="exceptional">Exceptional (2.50/mo)</option>
+            <option value="negative">Negative / Overused Balance</option>
+          </select>
+          <select id="lob-filter" onchange="renderDashboard()"
+            class="px-3 py-1.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700 text-slate-700 dark:text-neutral-200">
+            <option value="all">All LOBs</option>
+          </select>
+          <select id="supervisor-filter" onchange="renderDashboard()"
+            class="px-3 py-1.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700 text-slate-700 dark:text-neutral-200">
+            <option value="all">All Supervisors</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Responsive Agents Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-200 dark:border-neutral-800 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-neutral-400 bg-slate-50/70 dark:bg-neutral-800/60">
+              <th class="py-3 px-4 rounded-tl-xl">ID, Agent &amp; Email</th>
+              <th class="py-3 px-3">LOB &amp; Supervisor</th>
+              <th class="py-3 px-3">Hiring &amp; Tenure</th>
+              <th class="py-3 px-3">Current Rate</th>
+              <th class="py-3 px-3">Eligibility</th>
+              <th class="py-3 px-3 text-right">Deserved / Accrued</th>
+              <th class="py-3 px-3 text-center">Taken / Used</th>
+              <th class="py-3 px-3 text-right">Remaining Balance</th>
+              <th class="py-3 px-4 text-right rounded-tr-xl">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="agents-tbody" class="divide-y divide-slate-100 dark:divide-neutral-800 text-sm">
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Agent Self-Service Change Password Modal -->
+  <div id="agent-pwd-modal" class="fixed inset-0 z-50 hidden bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between bg-slate-50/70 dark:bg-neutral-800/60">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 dark:text-white">Update Your Password</h2>
+          <p class="text-[11px] text-slate-500 dark:text-neutral-400">Set a new personal sign-in password</p>
+        </div>
+        <button type="button" onclick="closeChangeOwnPasswordModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleAgentSelfPasswordChange(event)" class="p-6 space-y-4">
+        <div>
+          <label for="own-new-pwd" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">New Password</label>
+          <input type="password" id="own-new-pwd" required minlength="6" placeholder="Minimum 6 characters..."
+            class="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+        </div>
+        <div>
+          <label for="own-confirm-pwd" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Confirm New Password</label>
+          <input type="password" id="own-confirm-pwd" required minlength="6" placeholder="Re-enter new password..."
+            class="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+        </div>
+        <p id="own-pwd-error" class="hidden text-xs font-semibold text-rose-600 dark:text-rose-400"></p>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-neutral-800">
+          <button type="button" onclick="closeChangeOwnPasswordModal()" class="px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-neutral-300 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-xl transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">Save Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2026 & 2027 Payout Schedule Reference Modal -->
+  <div id="schedule-modal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/70 dark:bg-neutral-800/80">
+        <div>
+          <h2 id="schedule-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">Annual Leave Payout Schedule</h2>
+          <p id="schedule-modal-subtitle" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">1st-of-month accrual schedule across all 3 tiers</p>
+        </div>
+        <button onclick="closeScheduleModal()" class="w-8 h-8 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Schedule Year Switcher Tabs -->
+      <div class="px-6 pt-3 pb-1 border-b border-neutral-100 dark:border-neutral-800 flex items-center gap-2 bg-white dark:bg-neutral-900">
+        <button type="button" id="sched-tab-2026" onclick="switchScheduleTab('2026')"
+          class="px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-blue-800 text-white bg-blue-900 transition">
+          <i class="fa-solid fa-lock mr-1.5 text-[10px]"></i>2026 Schedule (Fixed Logic)
+        </button>
+        <button type="button" id="sched-tab-2027" onclick="switchScheduleTab('2027')"
+          class="px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition">
+          <i class="fa-solid fa-calendar-plus mr-1.5 text-[10px]"></i>2027 Schedule (Reset Cycle)
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto">
+        <div id="schedule-tab-banner" class="mb-3 px-3.5 py-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 text-xs text-blue-900 dark:text-blue-300">
+          <strong>Fixed 2026 Logic:</strong> 12 milestones from <strong>By 1-Feb</strong> through <strong>By 1-Jan</strong> (15 / 21 / 30 days).
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
+          <table class="w-full text-left border-collapse text-sm tabular-nums">
+            <thead>
+              <tr class="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 text-xs font-bold uppercase text-neutral-700 dark:text-neutral-200">
+                <th class="py-2.5 px-4">Milestone</th>
+                <th class="py-2.5 px-3 text-center">Less than 1 Year</th>
+                <th class="py-2.5 px-3 text-center">Year or More</th>
+                <th class="py-2.5 px-4 text-center">Exceptional</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-reference-tbody" class="divide-y divide-neutral-100 dark:divide-neutral-800"></tbody>
+            <tfoot id="schedule-reference-tfoot">
+              <tr class="bg-blue-50/80 dark:bg-blue-950/40 border-t-2 border-blue-200 dark:border-blue-800 font-bold text-neutral-900 dark:text-white">
+                <td id="schedule-total-label" class="py-3 px-4">Total 2026</td>
+                <td class="py-3 px-3 text-center text-blue-700 dark:text-blue-300">15</td>
+                <td class="py-3 px-3 text-center text-emerald-700 dark:text-emerald-300">21</td>
+                <td class="py-3 px-4 text-center text-purple-700 dark:text-purple-300">30</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-800/80 flex justify-end">
+        <button onclick="closeScheduleModal()" class="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Agent Modal -->
+  <div id="agent-modal" class="fixed inset-0 z-50 hidden bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between">
+        <h2 id="modal-title" class="text-base font-bold text-slate-900 dark:text-white">Add Team Agent</h2>
+        <button onclick="closeAgentModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="agent-form" onsubmit="saveAgent(event)" class="p-6 space-y-4">
+        <input type="hidden" id="agent-id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label for="agent-emp-id" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Agent ID</label>
+            <input type="text" id="agent-emp-id" required placeholder="e.g., 925"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <div class="sm:col-span-2">
+            <label for="agent-name" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Full Name</label>
+            <input type="text" id="agent-name" required placeholder="e.g., Sara Mahmoud"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="agent-dept" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">LOB / Role</label>
+            <input type="text" id="agent-dept" placeholder="e.g., MX, Wins, Social"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <div>
+            <label for="agent-supervisor" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Supervisor</label>
+            <input type="text" id="agent-supervisor" placeholder="e.g., Ahmed El Sawy"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="agent-join-date" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Hiring Date</label>
+            <input type="date" id="agent-join-date" required
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <div>
+            <label for="agent-used" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Taken / Used Days (2026)</label>
+            <input type="number" id="agent-used" step="0.25" min="0" value="0"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+        </div>
+
+        <!-- Agent Work Email & Password Reset Section (Admin Configurable) -->
+        <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-neutral-800/70 border border-slate-200 dark:border-neutral-700 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200">
+              <i class="fa-solid fa-envelope text-blue-600 dark:text-blue-400 mr-1.5"></i>Work Email &amp; Password Setup
+            </span>
+          <!-- Reset Roster Button -->
+          <button onclick="openResetConfirm()" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm" title="Reset to Default 52-Agent Roster">
+            <i class="fa-solid fa-rotate-left text-blue-200"></i>
+          </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="agent-login-user" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Username (or sign in with ID)</label>
+              <input type="text" id="agent-login-user" placeholder="e.g., mostafa.865"
+                class="w-full px-3 py-1.5 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label for="agent-login-pass" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Agent Password</label>
+              <input type="text" id="agent-login-pass" required placeholder="Tempo@123"
+                class="w-full px-3 py-1.5 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 flex items-start gap-3">
+          <input type="checkbox" id="agent-exceptional" class="mt-1 w-4 h-4 text-blue-800 rounded border-purple-300 focus:ring-blue-700">
+          <label for="agent-exceptional" class="text-xs text-slate-700 dark:text-neutral-300 cursor-pointer">
+            <span class="font-bold text-purple-900 dark:text-purple-300 block">Exceptional Team Member Rate (2.50 days / month)</span>
+            Assigns the 2.50 days/month accrual rate (30 days/year) to this team member, overriding the standard 1.25 / 1.75 tenure tiers.
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-neutral-800">
+          <button type="button" onclick="closeAgentModal()" class="px-4 py-2 text-sm font-medium text-slate-700 dark:text-neutral-300 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-xl transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">Save Agent</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Milestone Accrual & Consumed Breakdown Modal -->
+  <div id="breakdown-modal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
+        <div>
+          <h2 id="breakdown-title" class="text-base font-bold text-neutral-900 dark:text-white">1st-of-Month Milestone Ledger</h2>
+          <p id="breakdown-subtitle" class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5"></p>
+        </div>
+        <button onclick="closeBreakdownModal()" class="w-8 h-8 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="breakdown-summary" class="px-6 py-3 bg-neutral-50 dark:bg-neutral-800/80 border-b border-neutral-200 dark:border-neutral-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1">
+        <table class="w-full text-left border-collapse text-sm tabular-nums">
+          <thead>
+            <tr class="border-b border-neutral-200 dark:border-neutral-800 text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">
+              <th class="py-2 px-3">Milestone</th>
+              <th class="py-2 px-3">Applied Tier</th>
+              <th class="py-2 px-3 text-right">Accrued (+)</th>
+              <th class="py-2 px-3 text-center">Monthly Taken (-)</th>
+              <th class="py-2 px-3 text-right">Cumulative Accrued</th>
+            </tr>
+          </thead>
+          <tbody id="breakdown-tbody" class="divide-y divide-neutral-100 dark:divide-neutral-800"></tbody>
+        </table>
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-800/80 flex items-center justify-between">
+        <span class="text-xs text-neutral-500 dark:text-neutral-400"><i class="fa-solid fa-circle-info text-blue-500 dark:text-blue-400 mr-1"></i>Changes to monthly taken days recalculate automatically.</span>
+        <button onclick="closeBreakdownModal()" class="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Sheets Import / Sync Modal -->
+  <div id="sheets-modal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/80 dark:bg-neutral-800/80">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-blue-900 text-white flex items-center justify-center">
+            <i class="fa-solid fa-table"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-neutral-900 dark:text-white">Google Sheets Sync &amp; Consumed Leave Import</h2>
+            <p class="text-xs text-neutral-600 dark:text-neutral-400">Paste directly from your Google Sheet (ID, Name, Taken 2026, or monthly columns)</p>
+          </div>
+        </div>
+        <button onclick="closeSheetsModal()" class="w-8 h-8 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5 flex-1">
+        <!-- Method 1: Live Google Sheet URL -->
+        <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-800/70 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-200">Option A: Fetch from Public / Shared Google Sheet Link</span>
+            <span class="text-[11px] text-neutral-500 dark:text-neutral-400">Requires "Anyone with the link can view"</span>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input type="url" id="gsheet-url-input" placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit"
+              class="flex-1 px-3.5 py-2 text-xs sm:text-sm bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+            <button type="button" onclick="fetchFromGoogleSheetURL()" id="gsheet-fetch-btn"
+              class="px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shrink-0">
+              <i class="fa-solid fa-cloud-arrow-down mr-1.5"></i>Fetch Sheet
+            </button>
+          </div>
+        </div>
+
+        <!-- Method 2: Copy & Paste or Upload CSV -->
+        <div class="space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-200">Option B: Copy &amp; Paste from Google Sheets (or Upload CSV)</span>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="downloadConsumedTemplateCSV()" class="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline">
+                <i class="fa-solid fa-download mr-1"></i>Download Sheet Template
+              </button>
+              <label class="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline cursor-pointer">
+                <i class="fa-solid fa-file-arrow-up mr-1"></i>Upload CSV
+                <input type="file" accept=".csv,.tsv,.txt" onchange="handleCSVFileUpload(event)" class="hidden">
+              </label>
+            </div>
+          </div>
+
+          <textarea id="gsheet-paste-area" rows="6" oninput="previewPastedSheetData()"
+            placeholder="Copy cells directly from your Google Sheet (including header row) and press Ctrl+V here...&#10;&#10;Supported formats:&#10;1) Your exact table: Tenure | ID | Name | LOB | Supervisor | Hiring Date | Status | Deserved 2026 | Taken 2026 | Remaining 2026&#10;2) Monthly columns: ID | Name | 2026-09 | 2026-10 | 2026-11"
+            class="w-full p-3.5 text-xs font-mono bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700"></textarea>
+        </div>
+
+        <!-- Import Mode & Live Preview -->
+        <div id="gsheet-preview-box" class="hidden space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-blue-50/70 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-100 dark:border-blue-900/60">
+            <div class="text-xs text-blue-950 dark:text-blue-200">
+              <span class="font-bold" id="gsheet-preview-summary">0 rows detected</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs">
+              <label class="inline-flex items-center gap-1.5 cursor-pointer font-medium text-neutral-700 dark:text-neutral-300">
+                <input type="radio" name="sync-mode" value="overwrite" checked class="text-blue-800">
+                <span>Overwrite matched values</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer font-medium text-neutral-700 dark:text-neutral-300">
+                <input type="radio" name="sync-mode" value="add" class="text-blue-800">
+                <span>Add to existing</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="max-h-44 overflow-auto border border-neutral-200 dark:border-neutral-800 rounded-xl">
+            <table class="w-full text-left border-collapse text-xs tabular-nums">
+              <thead id="gsheet-preview-thead" class="bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-semibold"></thead>
+              <tbody id="gsheet-preview-tbody" class="divide-y divide-neutral-100 dark:divide-neutral-800"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-800/80 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeSheetsModal()" class="px-4 py-2 text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-700 transition">Cancel</button>
+        <button type="button" onclick="applyGoogleSheetsImport()" id="gsheet-apply-btn" disabled
+          class="px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition shadow-sm">
+          <i class="fa-solid fa-check mr-1.5"></i>Sync Consumed Days
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl w-full max-w-md p-6 space-y-4">
+      <div class="flex items-start gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h3 id="confirm-title" class="text-base font-bold text-neutral-900 dark:text-white">Confirm Action</h3>
+          <p id="confirm-message" class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Are you sure you want to proceed?</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2.5 pt-2">
+        <button onclick="closeConfirmModal()" class="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl transition">Cancel</button>
+        <button id="confirm-action-btn" class="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-neutral-900 dark:bg-neutral-800 text-white border border-neutral-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2.5 text-sm font-medium">
+      <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+      <span id="toast-text">Action completed</span>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. STATE, ROLE AUTH, THEME & DATE HELPERS
+    // =========================================================================
+    const STORAGE_KEY = 'annual_leave_tracker_v16_exact_emails52';
+    const THEME_STORAGE_KEY = 'leaveflow_tracker_theme';
+    const AUTH_SESSION_KEY = 'leaveflow_auth_session_v1';
+    const ADMIN_EMAIL = 'admin@tempo.fit';
+    const ADMIN_USER_LEGACY = 'admin';
+    const ADMIN_PASS = 'Tempo@2027';
+    const DEFAULT_AGENT_PASS = 'Tempo@123';
+
+    const TODAY_ISO = '2026-11-18';
+    const NEXT_MONTH_ISO = '2026-12-01';
+    const FULL_2026_ISO = '2027-01-01';
+    const START_2027_ISO = '2027-02-01';
+
+    let agents = [];
+    let activePreset = 'today';
+    let cycle2027MonthIndex = 0;
+    let accrualScope = 'ytd';
+    let currentScheduleTab = '2026';
+    let pendingConfirmCallback = null;
+    let parsedSheetRows = [];
+    let loginRole = 'agent';
+    let authSession = { role: null, agentId: null };
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+      applyTheme(isDark);
+    }
+
+    function applyTheme(isDark) {
+      const htmlEl = document.documentElement;
+      const iconEl = document.getElementById('theme-toggle-icon');
+      if (isDark) {
+        htmlEl.classList.add('dark');
+        if (iconEl) iconEl.className = 'fa-solid fa-sun text-sm';
+      } else {
+        htmlEl.classList.remove('dark');
+        if (iconEl) iconEl.className = 'fa-solid fa-moon text-sm';
+      }
+      localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : 'light');
+    }
+
+    function toggleTheme() {
+      applyTheme(!document.documentElement.classList.contains('dark'));
+    }
+
+    function buildDefaultEmail(name, empId) {
+      const parts = (name || 'agent').trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        return `${parts[0]}.${parts[parts.length - 1]}@tempo.fit`;
+      }
+      return `${parts[0] || 'agent'}.${String(empId).trim()}@tempo.fit`;
+    }
+
+    function buildDefaultUsername(name, empId) {
+      const first = (name || 'agent').trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      return `${first || 'agent'}.${String(empId).trim().toLowerCase()}`;
+    }
+
+    function loadAuthSession() {
+      try {
+        const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.role === 'admin' || parsed.role === 'agent')) {
+            authSession = parsed;
+          }
+        }
+      } catch (e) {
+        authSession = { role: null, agentId: null };
+      }
+    }
+
+    function saveAuthSession() {
+      try {
+        sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(authSession));
+      } catch (e) {}
+    }
+
+    function selectLoginRole(role) {
+      loginRole = role === 'admin' ? 'admin' : 'agent';
+      const agentBtn = document.getElementById('login-role-agent-btn');
+      const adminBtn = document.getElementById('login-role-admin-btn');
+      const userLabel = document.getElementById('login-username-label');
+      const userInput = document.getElementById('login-username-input');
+      const passInput = document.getElementById('login-password-input');
+      const submitText = document.getElementById('login-submit-text');
+      const hintText = document.getElementById('login-hint-text');
+      const errBox = document.getElementById('login-error-msg');
+      const banner = document.getElementById('first-time-detected-banner');
+
+      if (errBox) errBox.classList.add('hidden');
+      if (banner) banner.classList.add('hidden');
+
+      if (loginRole === 'admin') {
+        adminBtn.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-blue-900 text-white shadow-xs transition flex items-center justify-center gap-2';
+        agentBtn.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition flex items-center justify-center gap-2';
+        userLabel.textContent = 'Admin Email or Username';
+        userInput.type = 'text';
+        userInput.placeholder = 'admin@tempo.fit or Admin';
+        if (passInput) passInput.placeholder = 'Enter admin password...';
+        if (submitText) submitText.textContent = 'Sign In as Admin';
+        if (hintText) {
+          hintText.innerHTML = 'Sign in with <code class="font-mono text-slate-700 dark:text-neutral-200">admin@tempo.fit</code> (or <code class="font-mono text-slate-700 dark:text-neutral-200">Admin</code>) and your admin password.';
+        }
+      } else {
+        agentBtn.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-blue-900 text-white shadow-xs transition flex items-center justify-center gap-2';
+        adminBtn.className = 'py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition flex items-center justify-center gap-2';
+        userLabel.textContent = 'Work Email, Employee ID, or Name';
+        userInput.type = 'text';
+        userInput.placeholder = 'e.g., mostafa.adel@tempo.fit or 522';
+        if (passInput) passInput.placeholder = 'Tempo@123 (for 1st login)';
+        if (submitText) submitText.textContent = 'Sign In to My Balance';
+        if (hintText) {
+          hintText.innerHTML = 'Use your <strong>Work Email</strong> (e.g., <code class="font-mono text-slate-700 dark:text-neutral-200">mostafa.adel@tempo.fit</code>), <strong>Employee ID</strong> (<code class="font-mono text-slate-700 dark:text-neutral-200">522</code>), or <strong>Full Name</strong> with fixed 1st-login password <code class="font-mono text-slate-700 dark:text-neutral-200">Tempo@123</code>.';
+        }
+      }
+    }
+
+    function checkAgentFirstTimeEmailStatus() {
+      const errBox = document.getElementById('login-error-msg');
+      if (errBox) errBox.classList.add('hidden');
+    }
+
+    function toggleLoginPasswordVisibility() {
+      const input = document.getElementById('login-password-input');
+      const icon = document.getElementById('login-pwd-eye-icon');
+      if (!input || !icon) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-regular fa-eye-slash text-xs';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-regular fa-eye text-xs';
+      }
+    }
+
+    function handleUnifiedLogin(event) {
+      event.preventDefault();
+      const rawIdentifier = (document.getElementById('login-username-input').value || '').trim();
+      const password = (document.getElementById('login-password-input').value || '').trim();
+      const errBox = document.getElementById('login-error-msg');
+      const errText = document.getElementById('login-error-text');
+
+      if (loginRole === 'admin') {
+        const idNorm = rawIdentifier.toLowerCase();
+        if ((idNorm === ADMIN_EMAIL || idNorm === ADMIN_USER_LEGACY) && password === ADMIN_PASS) {
+          authSession = { role: 'admin', agentId: null };
+          saveAuthSession();
+          document.getElementById('login-password-input').value = '';
+          if (errBox) errBox.classList.add('hidden');
+          applyRoleUI();
+          showToast('Signed in as Admin');
+        } else {
+          if (errText) errText.textContent = 'Invalid Admin email/username or password.';
+          if (errBox) errBox.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const idLower = rawIdentifier.toLowerCase();
+      const matchedAgent = agents.find(a =>
+        String(a.empId || '').trim().toLowerCase() === idLower ||
+        String(a.email || '').trim().toLowerCase() === idLower ||
+        String(a.username || '').trim().toLowerCase() === idLower ||
+        String(a.name || '').trim().toLowerCase() === idLower
+      );
+
+      if (matchedAgent) {
+        const storedPass = String(matchedAgent.password || DEFAULT_AGENT_PASS).trim();
+        const isFirstLoginDefault = !matchedAgent.passwordUpdated && (password === DEFAULT_AGENT_PASS || password.toLowerCase() === DEFAULT_AGENT_PASS.toLowerCase());
+        const isCustomMatch = password === storedPass;
+
+        if (isFirstLoginDefault || isCustomMatch) {
+          authSession = { role: 'agent', agentId: matchedAgent.id };
+          saveAuthSession();
+          document.getElementById('login-password-input').value = '';
+          if (errBox) errBox.classList.add('hidden');
+          applyRoleUI();
+          showToast(`Welcome, ${matchedAgent.name}`);
+          return;
+        }
+      }
+
+      if (errText) {
+        errText.textContent = matchedAgent
+          ? 'Incorrect password. Use Tempo@123 (or your updated password).'
+          : 'Agent not found. Try your Employee ID (e.g., 522), Full Name, or @tempo.fit email.';
+      }
+      if (errBox) errBox.classList.remove('hidden');
+    }
+
+    function cancelFirstTimePasswordSetup() {
+      const step1 = document.getElementById('login-step-signin');
+      const step2 = document.getElementById('login-step-create-pwd');
+      if (step2) step2.classList.add('hidden');
+      if (step1) step1.classList.remove('hidden');
+    }
+
+    function signOutSession() {
+      authSession = { role: null, agentId: null };
+      saveAuthSession();
+      applyRoleUI();
+      showToast('Signed out');
+    }
+
+    function applyRoleUI() {
+      const loginView = document.getElementById('login-gate-view');
+      const empView = document.getElementById('employee-portal-view');
+      const adminView = document.getElementById('admin-dashboard-view');
+      const adminControls = document.getElementById('admin-header-controls');
+      const schedulesBtn = document.getElementById('schedules-header-btn');
+      const signOutBtn = document.getElementById('sign-out-btn');
+      const badge = document.getElementById('role-mode-badge');
+      const badgeText = document.getElementById('role-mode-text');
+      const subtitle = document.getElementById('header-subtitle');
+
+      loginView.classList.add('hidden');
+      empView.classList.add('hidden');
+      adminView.classList.add('hidden');
+      adminControls.classList.add('hidden');
+      if (schedulesBtn) schedulesBtn.classList.add('hidden');
+      signOutBtn.classList.add('hidden');
+
+      if (authSession.role === 'admin') {
+        adminView.classList.remove('hidden');
+        adminControls.classList.remove('hidden');
+        if (schedulesBtn) schedulesBtn.classList.remove('hidden');
+        signOutBtn.classList.remove('hidden');
+        badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-900 text-white border border-blue-800';
+        badgeText.textContent = 'Admin Mode';
+        if (subtitle) subtitle.textContent = 'Admin Management Portal • Full Roster & Sync';
+        renderDashboard();
+      } else if (authSession.role === 'agent') {
+        const currentAgent = agents.find(a => a.id === authSession.agentId);
+        if (!currentAgent) {
+          authSession = { role: null, agentId: null };
+          saveAuthSession();
+          applyRoleUI();
+          return;
+        }
+        empView.classList.remove('hidden');
+        signOutBtn.classList.remove('hidden');
+        badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200 border border-blue-200 dark:border-blue-800';
+        badgeText.textContent = `Agent #${currentAgent.empId}`;
+        if (subtitle) subtitle.textContent = `Personal Leave Portal • ${currentAgent.name}`;
+        renderEmployeePortal();
+      } else {
+        loginView.classList.remove('hidden');
+        badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700';
+        badgeText.textContent = 'Sign In Required';
+        if (subtitle) subtitle.textContent = 'Email-Authenticated Leave Balance Portal';
+      }
+    }
+
+    function openChangeOwnPasswordModal() {
+      const modal = document.getElementById('agent-pwd-modal');
+      const err = document.getElementById('own-pwd-error');
+      document.getElementById('own-new-pwd').value = '';
+      document.getElementById('own-confirm-pwd').value = '';
+      if (err) err.classList.add('hidden');
+      modal.classList.remove('hidden');
+    }
+
+    function closeChangeOwnPasswordModal() {
+      document.getElementById('agent-pwd-modal').classList.add('hidden');
+    }
+
+    function handleAgentSelfPasswordChange(event) {
+      event.preventDefault();
+      const newPwd = (document.getElementById('own-new-pwd').value || '').trim();
+      const confirmPwd = (document.getElementById('own-confirm-pwd').value || '').trim();
+      const err = document.getElementById('own-pwd-error');
+
+      if (newPwd.length < 6) {
+        err.textContent = 'Password must be at least 6 characters.';
+        err.classList.remove('hidden');
+        return;
+      }
+      if (newPwd !== confirmPwd) {
+        err.textContent = 'Passwords do not match.';
+        err.classList.remove('hidden');
+        return;
+      }
+
+      const agent = agents.find(a => a.id === authSession.agentId);
+      if (agent) {
+        agent.password = newPwd;
+        agent.passwordUpdated = true;
+        saveAgents();
+        closeChangeOwnPasswordModal();
+        showToast('Your sign-in password has been updated');
+      }
+    }
+
+    function parseLocalDate(isoStr) {
+      if (!isoStr || typeof isoStr !== 'string') return new Date(2026, 0, 1);
+      const parts = isoStr.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return new Date(2026, 0, 1);
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function formatDisplayDate(isoStr) {
+      const d = parseLocalDate(isoStr);
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function addMonthsClamped(dateObj, monthsToAdd) {
+      const targetYear = dateObj.getFullYear();
+      const targetMonth = dateObj.getMonth() + monthsToAdd;
+      const day = dateObj.getDate();
+      const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      return new Date(targetYear, targetMonth, Math.min(day, lastDayOfTargetMonth));
+    }
+
+    function getFirstAccrualMilestoneDate(joinDateObj) {
+      const offset = joinDateObj.getDate() > 25 ? 2 : 1;
+      return new Date(joinDateObj.getFullYear(), joinDateObj.getMonth() + offset, 1);
+    }
+
+    function getOneYearTierUpgradeDate(joinDateObj) {
+      const exactAnniversary = addMonthsClamped(joinDateObj, 12);
+      if (exactAnniversary.getDate() === 1) {
+        return new Date(exactAnniversary.getFullYear(), exactAnniversary.getMonth(), 1);
+      }
+      return new Date(exactAnniversary.getFullYear(), exactAnniversary.getMonth() + 1, 1);
+    }
+
+    function formatYearMonth(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    }
+
+    function formatMilestoneLabel(dateObj) {
+      const monthShort = dateObj.toLocaleDateString('en-US', { month: 'short' });
+      const yrShort = String(dateObj.getFullYear()).slice(-2);
+      return `By 1-${monthShort}-${yrShort}`;
+    }
+
+    function formatNumber(num) {
+      const rounded = Math.round((Number(num) || 0) * 100) / 100;
+      return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(2).replace(/\.?0+$/, '');
+    }
+
+    function getActiveReferenceDateISO() {
+      if (activePreset === 'next_month') return NEXT_MONTH_ISO;
+      if (activePreset === 'full_2026') return FULL_2026_ISO;
+      if (activePreset === 'cycle_2027') {
+        const d = new Date(2027, 1 + Number(cycle2027MonthIndex || 0), 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+      }
+      return TODAY_ISO;
+    }
+
+    function getDefaultAgents() {
+      const rawRoster = [
+        { empId: '234', name: 'Khaled El Sabban', email: 'khaledsabban@tempo.fit', dept: 'Operation Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-01-21', usedDays: 10, isExceptional: true },
+        { empId: '530', name: 'Job James', email: 'job.james@tempo.fit', dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2021-10-13', usedDays: 11 },
+        { empId: '218', name: 'Ahmed Elsawy', email: 'ahmed.elsawy@tempo.fit', dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2022-03-07', usedDays: 6 },
+        { empId: '209', name: 'Ahmed Mahmoud', email: 'ahmed.mahmoud@tempo.fit', dept: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2022-06-05', usedDays: 6.5 },
+        { empId: '224', name: 'Lina Hesham', email: 'linahesham@tempo.fit', dept: 'Social', supervisor: 'Mohamed Mounir', joinDate: '2022-09-01', usedDays: 10 },
+        { empId: '531', name: 'Ariath Piol', email: 'ariath.piol@tempo.fit', dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-11-28', usedDays: 8 },
+        { empId: '805', name: 'Rima Zaki', email: 'rima.khaled@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2023-03-19', usedDays: 7 },
+        { empId: '180', name: 'Mohamed Mounir', email: 'mohamed.abdelmagid@tempo.fit', dept: 'Change Integration Manager', supervisor: 'Nancy Elsharony', joinDate: '2023-04-26', usedDays: 3 },
+        { empId: '832', name: 'Ahmed Abdelghany', email: 'ahmed.abdelghany@tempo.fit', dept: 'QA', supervisor: 'Heba El Sobky', joinDate: '2023-05-07', usedDays: 6 },
+        { empId: '476', name: 'Hassan Khallaf', email: 'hassan@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2023-06-12', usedDays: 4 },
+        { empId: '174', name: 'Mohab Magdy', email: 'mohab.magdy@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2023-06-12', usedDays: 7 },
+        { empId: '792', name: 'Rashad Mohamed', email: 'rashad.mohamed@tempo.fit', dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-08-01', usedDays: 4 },
+        { empId: '522', name: 'Mostafa Adel', email: 'mostafa.adel@tempo.fit', dept: 'Workforce Analyst', supervisor: 'Mohamed Halim', joinDate: '2023-09-18', usedDays: 6 },
+        { empId: '212', name: 'Marwa Ahmed', email: 'marwa.ahmed@tempo.fit', dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2023-10-09', usedDays: 5 },
+        { empId: '808', name: 'Noha Radwan', email: 'noha.radwan@tempo.fit', dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-11-27', usedDays: 8 },
+        { empId: '705', name: 'Fatma Mohammed', email: 'fatma.mohammad@tempo.fit', dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2024-03-04', usedDays: 9.5 },
+        { empId: '876', name: 'Andrew Osama Khalil', email: 'andrew.khalil@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2024-04-22', usedDays: 9 },
+        { empId: '880', name: 'Ammar Ahmed', email: 'ammar.ahmed@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2024-05-27', usedDays: 9 },
+        { empId: '878', name: 'Mostafa Ashraf', email: 'mostafa.abdelrahim@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2024-05-27', usedDays: 9 },
+        { empId: '194', name: 'Heba El Sobky', email: 'hebasobky@tempo.fit', dept: 'QA Lead', supervisor: 'Nancy Elsharony', joinDate: '2024-06-03', usedDays: 7 },
+        { empId: '755', name: 'Aida Clement', email: 'aida.clement@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2024-07-08', usedDays: 5.5 },
+        { empId: '889', name: 'Mohamed Faheem', email: 'mohamed.faheem@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2024-07-08', usedDays: 6 },
+        { empId: '873', name: 'Salma Atef', email: 'salma.atef@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2024-09-23', usedDays: 10 },
+        { empId: '787', name: 'Khaled Ahmed', email: 'khaled.ahmed@tempo.fit', dept: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2024-11-11', usedDays: 5 },
+        { empId: '401', name: 'Mohamed Halim', email: 'halim@tempo.fit', dept: 'Workforce Manager', supervisor: 'Nancy Elsharony', joinDate: '2024-12-08', usedDays: 2 },
+        { empId: '850', name: 'Ashraf Essam', email: 'ashraf.essam@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-01-13', usedDays: 3 },
+        { empId: '869', name: 'Stephan Radu Onose', email: 'stephan.radu@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2025-01-13', usedDays: 6 },
+        { empId: '865', name: 'Mostafa Mohamed Hosny', email: 'mostafa.hosny@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-02-24', usedDays: 5 },
+        { empId: '851', name: 'Hala Ayman', email: 'hala.ayman@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-02-24', usedDays: 2 },
+        { empId: '868', name: 'Abdelrahman Fathy', email: 'abdelrahman.fathy@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2025-04-21', usedDays: 1 },
+        { empId: '816', name: 'Hagar Alaa', email: 'hagar.alaa@tempo.fit', dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2025-06-09', usedDays: 0 },
+        { empId: '882', name: 'Ibrahem Mohamed Mosbah', email: 'ibrahe.mosbah@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2025-07-07', usedDays: 1 },
+        { empId: '467', name: 'Emad Mohamed', email: 'emad.mohamed@tempo.fit', dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2025-07-28', usedDays: 1 },
+        { empId: '523', name: 'Nada Ashraf', email: 'nada.ashraf@tempo.fit', dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2025-08-25', usedDays: 3.5 },
+        { empId: '861', name: 'Shahd Emad', email: 'shahd.emad@tempo.fit', dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2026-07-13', usedDays: 0, forceSeniorRate: true },
+        { empId: '164', name: 'Nancy Elsharony', email: 'nancy@tempo.fit', dept: 'Leadership', supervisor: 'Leadership', joinDate: '2021-01-01', usedDays: 0 },
+        { empId: '253', name: 'Salma Ramadan', email: 'salmaramadan@tempo.fit', dept: 'Operations', supervisor: 'Nancy Elsharony', joinDate: '2022-01-01', usedDays: 0 },
+        { empId: '405', name: 'Menna', email: 'menna@tempo.fit', dept: 'Operations', supervisor: 'Nancy Elsharony', joinDate: '2023-01-01', usedDays: 0 },
+        { empId: '901', name: 'Mohra Khaled', email: 'mohra.khaled@tempo.fit', dept: 'Realtime Analyst', supervisor: 'Mohamed Halim', joinDate: '2026-09-14', usedDays: 0, tenureGroup: 'New' },
+        { empId: '902', name: 'Ruben Joseph', email: 'ruben.joseph@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '903', name: 'Yussif Zayed', email: 'yussif.zayed@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '906', name: 'Howida Mattar', email: 'howida.mattar@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '907', name: 'Rowan Ashour', email: 'rowan.ashour@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '908', name: 'Amr El Torgman', email: 'amr.eltorgman@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '909', name: 'Khaled Ahmed Abbas', email: 'khaled.abbas@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '910', name: 'Abdelrahman Amr', email: 'abdelrahman.amr@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '912', name: 'Mohamed Shebl', email: 'mohamed.shebl@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '913', name: 'Noureldin Mahmoud Hassan', email: 'noureldin.hassan@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '914', name: 'Ahmed Keshk', email: 'ahmed.keshk@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '915', name: 'Ahmed Abbas', email: 'ahmed.abbas@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '917', name: 'Tarneem Elnaggar', email: 'tarneem.elnaggar@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
+        { empId: '922', name: 'Alaa Mousa', email: 'alaa.mousa@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' }
+      ];
+
+      return rawRoster.map((item, idx) => ({
+        id: `agent_${item.empId}_${idx}`,
+        empId: item.empId,
+        name: item.name,
+        email: item.email || buildDefaultEmail(item.name, item.empId),
+        dept: item.dept,
+        supervisor: item.supervisor,
+        joinDate: item.joinDate,
+        tenureGroup: item.tenureGroup || 'Old',
+        isExceptional: Boolean(item.isExceptional),
+        forceSeniorRate: Boolean(item.forceSeniorRate),
+        username: buildDefaultUsername(item.name, item.empId),
+        password: DEFAULT_AGENT_PASS,
+        passwordUpdated: false,
+        monthlyTaken: item.usedDays > 0 ? { '2026-02': item.usedDays } : {}
+      }));
+    }
+
+    function loadAgents() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            agents = parsed.map(a => {
+              if (!a.monthlyTaken || typeof a.monthlyTaken !== 'object') {
+                a.monthlyTaken = (Number(a.usedDays) || 0) > 0 ? { '2026-02': Number(a.usedDays) } : {};
+              }
+              if (!a.email) a.email = buildDefaultEmail(a.name, a.empId);
+              if (!a.username) a.username = buildDefaultUsername(a.name, a.empId);
+              if (!a.password) a.password = DEFAULT_AGENT_PASS;
+              if (typeof a.passwordUpdated !== 'boolean') a.passwordUpdated = a.password !== DEFAULT_AGENT_PASS;
+              return a;
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load agents from storage:', e);
+      }
+      agents = getDefaultAgents();
+      saveAgents();
+    }
+
+    function saveAgents() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(agents));
+      } catch (e) {
+        console.error('Failed to save agents:', e);
+      }
+    }
+
+    // =========================================================================
+    // 2. CORE ACCRUAL & ELIGIBILITY ENGINE (2026 FIXED LOGIC + 2027 RESET)
+    // =========================================================================
+    function calculateAgentLeave(agent, refDate) {
+      const joinDate = parseLocalDate(agent.joinDate);
+      const is2027Cycle = activePreset === 'cycle_2027';
+      const probationEndDate = addMonthsClamped(joinDate, 3);
+      const isEligible = refDate >= probationEndDate;
+      const firstPayoutDate = getFirstAccrualMilestoneDate(joinDate);
+      const upgradeDate = getOneYearTierUpgradeDate(joinDate);
+
+      let scheduleStart;
+      if (is2027Cycle) {
+        const start2027 = parseLocalDate(START_2027_ISO);
+        scheduleStart = firstPayoutDate > start2027 ? firstPayoutDate : start2027;
+      } else if (accrualScope === 'ytd') {
+        const sched2026Start = new Date(2026, 1, 1);
+        scheduleStart = firstPayoutDate > sched2026Start ? firstPayoutDate : sched2026Start;
+      } else {
+        scheduleStart = firstPayoutDate;
+      }
+
+      const ledger = [];
+      let totalAccrued = 0;
+
+      if (scheduleStart <= refDate) {
+        let cursor = new Date(scheduleStart.getFullYear(), scheduleStart.getMonth(), 1);
+        while (cursor <= refDate) {
+          const ym = formatYearMonth(cursor);
+          let monthlyRate = 1.25;
+          let tierLabel = 'Less than 1 Year (1.25)';
+
+          if (agent.isExceptional) {
+            monthlyRate = 2.50;
+            tierLabel = 'Exceptional (2.50)';
+          } else if (agent.forceSeniorRate || cursor >= upgradeDate) {
+            monthlyRate = 1.75;
+            tierLabel = 'Year or More (1.75)';
+          }
+
+          totalAccrued = Math.round((totalAccrued + monthlyRate) * 1000) / 1000;
+          const takenInMonth = is2027Cycle ? 0 : (Number((agent.monthlyTaken || {})[ym]) || 0);
+
+          ledger.push({
+            ym,
+            milestoneLabel: formatMilestoneLabel(cursor),
+            rate: monthlyRate,
+            tierLabel,
+            taken: takenInMonth,
+            cumulativeAccrued: totalAccrued
+          });
+
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        }
+      }
+
+      let totalUsed = 0;
+      if (!is2027Cycle && agent.monthlyTaken && typeof agent.monthlyTaken === 'object') {
+        Object.values(agent.monthlyTaken).forEach(val => {
+          totalUsed += Number(val) || 0;
+        });
+      }
+      totalUsed = Math.round(totalUsed * 1000) / 1000;
+
+      let currentRate = 1.25;
+      let rateTier = 'tier1';
+      if (agent.isExceptional) {
+        currentRate = 2.50;
+        rateTier = 'exceptional';
+      } else if (agent.forceSeniorRate || refDate >= upgradeDate) {
+        currentRate = 1.75;
+        rateTier = 'tier2';
+      }
+
+      const remainingBalance = Math.round((totalAccrued - totalUsed) * 1000) / 1000;
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const daysUntilEligible = isEligible ? 0 : Math.max(0, Math.ceil((probationEndDate - refDate) / msPerDay));
+      const totalMonthsElapsed = Math.max(0, (refDate.getFullYear() - joinDate.getFullYear()) * 12 + (refDate.getMonth() - joinDate.getMonth()));
+      const tenureYears = Math.floor(totalMonthsElapsed / 12);
+      const tenureMonths = totalMonthsElapsed % 12;
+
+      return {
+        joinDate,
+        probationEndDate,
+        firstPayoutDate,
+        upgradeDate,
+        isEligible,
+        daysUntilEligible,
+        tenureYears,
+        tenureMonths,
+        currentRate,
+        rateTier,
+        totalAccrued,
+        totalUsed,
+        remainingBalance,
+        ledger,
+        is2027Cycle
+      };
+    }
+
+    // =========================================================================
+    // 3. DATE PRESET & EMPLOYEE SELF-SERVICE PORTAL RENDERING
+    // =========================================================================
+    function syncDatePresetButtons() {
+      const activeCls = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition';
+      const inactiveCls = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
+
+      const pairs = [
+        ['preset-today-btn', 'today'],
+        ['preset-next-month-btn', 'next_month'],
+        ['preset-2026-btn', 'full_2026'],
+        ['preset-2027-btn', 'cycle_2027'],
+        ['emp-preset-today-btn', 'today'],
+        ['emp-preset-next-month-btn', 'next_month'],
+        ['emp-preset-2026-btn', 'full_2026'],
+        ['emp-preset-2027-btn', 'cycle_2027']
+      ];
+
+      pairs.forEach(([id, preset]) => {
+        const el = document.getElementById(id);
+        if (el) el.className = activePreset === preset ? activeCls : inactiveCls;
+      });
+
+      const is2027 = activePreset === 'cycle_2027';
+      const admin2027Wrap = document.getElementById('cycle-2027-milestone-wrap');
+      const emp2027Wrap = document.getElementById('emp-2027-milestone-wrap');
+      const scopeWrap = document.getElementById('accrual-scope-wrap');
+
+      if (admin2027Wrap) admin2027Wrap.classList.toggle('hidden', !is2027);
+      if (emp2027Wrap) emp2027Wrap.classList.toggle('hidden', !is2027);
+      if (scopeWrap) scopeWrap.classList.toggle('hidden', is2027);
+    }
+
+    function setDatePreset(preset) {
+      activePreset = preset;
+      syncDatePresetButtons();
+      if (authSession.role === 'admin') renderDashboard();
+      if (authSession.role === 'agent') renderEmployeePortal();
+    }
+
+    function setEmployeeDatePreset(preset) {
+      setDatePreset(preset);
+    }
+
+    function setCycle2027Month(monthIdx) {
+      cycle2027MonthIndex = Number(monthIdx) || 0;
+      const adminSel = document.getElementById('cycle-2027-milestone-select');
+      const empSel = document.getElementById('emp-2027-milestone-select');
+      if (adminSel) adminSel.value = String(cycle2027MonthIndex);
+      if (empSel) empSel.value = String(cycle2027MonthIndex);
+      if (authSession.role === 'admin') renderDashboard();
+      if (authSession.role === 'agent') renderEmployeePortal();
+    }
+
+    function setAccrualScope(scope) {
+      accrualScope = scope;
+      const ytdBtn = document.getElementById('scope-ytd-btn');
+      const cumBtn = document.getElementById('scope-cum-btn');
+      const activeCls = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition';
+      const inactiveCls = 'px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
+      if (ytdBtn) ytdBtn.className = scope === 'ytd' ? activeCls : inactiveCls;
+      if (cumBtn) cumBtn.className = scope === 'cumulative' ? activeCls : inactiveCls;
+      renderDashboard();
+    }
+
+    function renderEmployeePortal() {
+      const agent = agents.find(a => a.id === authSession.agentId);
+      if (!agent) return;
+
+      const refDateISO = getActiveReferenceDateISO();
+      const refDate = parseLocalDate(refDateISO);
+      const calc = calculateAgentLeave(agent, refDate);
+
+      const initials = agent.name.split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+      document.getElementById('emp-avatar-initials').textContent = initials || 'AG';
+      document.getElementById('emp-card-id').textContent = `#${agent.empId}`;
+      document.getElementById('emp-card-name').textContent = agent.name;
+      document.getElementById('emp-card-meta').textContent = `${agent.dept || 'Operations'} • Supervisor: ${agent.supervisor || '—'} • Hired ${formatDisplayDate(agent.joinDate)}`;
+
+      const eligEl = document.getElementById('emp-card-eligibility');
+      eligEl.innerHTML = calc.isEligible
+        ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><i class="fa-solid fa-circle-check text-[10px]"></i> Eligible</span>'
+        : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><i class="fa-solid fa-hourglass-half text-[10px]"></i> In Probation (${calc.daysUntilEligible}d left)</span>`;
+
+      document.getElementById('emp-stat-remaining').textContent = formatNumber(calc.remainingBalance);
+      document.getElementById('emp-stat-remaining-note').textContent = calc.is2027Cycle
+        ? '2027 cycle (2026 reset)'
+        : (calc.remainingBalance < 0 ? 'Overused balance' : 'Available balance');
+
+      document.getElementById('emp-stat-accrued').textContent = formatNumber(calc.totalAccrued);
+      document.getElementById('emp-stat-payouts').textContent = `${calc.ledger.length} milestone payout${calc.ledger.length === 1 ? '' : 's'}`;
+
+      document.getElementById('emp-stat-taken').textContent = formatNumber(calc.totalUsed);
+      document.getElementById('emp-stat-taken-note').textContent = calc.is2027Cycle ? 'Reset to 0 for 2027' : 'Consumed leave days';
+
+      document.getElementById('emp-stat-rate').textContent = formatNumber(calc.currentRate);
+      document.getElementById('emp-stat-rate-note').textContent = agent.isExceptional ? 'Exceptional (30/yr)' : (calc.currentRate === 1.75 ? 'Senior ≥ 1 Yr (21/yr)' : 'Standard < 1 Yr (15/yr)');
+
+      document.getElementById('emp-date-first-payout').textContent = formatMilestoneLabel(calc.firstPayoutDate);
+      document.getElementById('emp-date-probation').textContent = calc.probationEndDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      document.getElementById('emp-date-anniversary').textContent = agent.isExceptional
+        ? 'Exceptional (2.50/mo)'
+        : (agent.forceSeniorRate ? 'Active (1.75/mo)' : formatMilestoneLabel(calc.upgradeDate));
+
+      document.getElementById('emp-ledger-subtitle').textContent = calc.is2027Cycle
+        ? `2027 Reset Cycle milestones through ${formatDisplayDate(refDateISO)}`
+        : `Accrual milestones through ${formatDisplayDate(refDateISO)}`;
+
+      const tbody = document.getElementById('emp-ledger-tbody');
+      if (calc.ledger.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-xs text-slate-500 dark:text-neutral-400">No accrual milestones reached yet by ${formatDisplayDate(refDateISO)}.</td></tr>`;
+      } else {
+        tbody.innerHTML = calc.ledger.map(row => `
+          <tr class="hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition">
+            <td class="py-2.5 px-4 font-semibold text-slate-800 dark:text-neutral-200">${row.milestoneLabel}</td>
+            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-neutral-400">${row.tierLabel}</td>
+            <td class="py-2.5 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">+${formatNumber(row.rate)}</td>
+            <td class="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400">${row.taken > 0 ? `-${formatNumber(row.taken)}` : '0'}</td>
+            <td class="py-2.5 px-4 text-right font-bold text-slate-900 dark:text-white">${formatNumber(row.cumulativeAccrued)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // =========================================================================
+    // 4. ADMIN DASHBOARD RENDERING & INLINE ACTIONS
+    // =========================================================================
+    function populateDynamicFilters() {
+      const lobSelect = document.getElementById('lob-filter');
+      const supSelect = document.getElementById('supervisor-filter');
+      if (!lobSelect || !supSelect) return;
+
+      const currentLob = lobSelect.value || 'all';
+      const currentSup = supSelect.value || 'all';
+
+      const lobs = [...new Set(agents.map(a => a.dept).filter(Boolean))].sort();
+      const sups = [...new Set(agents.map(a => a.supervisor).filter(Boolean))].sort();
+
+      lobSelect.innerHTML = '<option value="all">All LOBs</option>' +
+        lobs.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+      supSelect.innerHTML = '<option value="all">All Supervisors</option>' +
+        sups.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+
+      if (lobs.includes(currentLob)) lobSelect.value = currentLob;
+      if (sups.includes(currentSup)) supSelect.value = currentSup;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderDashboard() {
+      populateDynamicFilters();
+      const refDateISO = getActiveReferenceDateISO();
+      const refDate = parseLocalDate(refDateISO);
+      const is2027Cycle = activePreset === 'cycle_2027';
+
+      const searchTerm = (document.getElementById('search-input')?.value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('status-filter')?.value || 'all';
+      const lobFilter = document.getElementById('lob-filter')?.value || 'all';
+      const supFilter = document.getElementById('supervisor-filter')?.value || 'all';
+
+      const enriched = agents.map(agent => ({
+        agent,
+        calc: calculateAgentLeave(agent, refDate)
+      }));
+
+      let totalAccruedAll = 0;
+      let totalUsedAll = 0;
+      let totalAvailableAll = 0;
+      let eligibleCount = 0;
+      let probationCount = 0;
+
+      enriched.forEach(({ calc }) => {
+        totalAccruedAll += calc.totalAccrued;
+        totalUsedAll += calc.totalUsed;
+        totalAvailableAll += calc.remainingBalance;
+        if (calc.isEligible) eligibleCount++;
+        else probationCount++;
+      });
+
+      document.getElementById('stat-total-agents').textContent = String(agents.length);
+      document.getElementById('stat-eligible-sub').textContent = `${eligibleCount} eligible • ${probationCount} in probation`;
+      document.getElementById('stat-total-accrued').textContent = formatNumber(totalAccruedAll);
+      document.getElementById('stat-total-used').textContent = formatNumber(totalUsedAll);
+      document.getElementById('stat-total-available').textContent = formatNumber(totalAvailableAll);
+      document.getElementById('stat-accrued-label').textContent = is2027Cycle ? '2027 Accrued' : 'Deserved / Accrued';
+      document.getElementById('stat-used-label').textContent = is2027Cycle ? '2027 Taken (Reset)' : 'Taken / Used Days';
+      document.getElementById('stat-available-label').textContent = is2027Cycle ? '2027 Remaining' : 'Remaining Balance';
+
+      const filtered = enriched.filter(({ agent, calc }) => {
+        if (searchTerm) {
+          const hay = `${agent.empId} ${agent.name} ${agent.email || ''} ${agent.dept || ''} ${agent.supervisor || ''}`.toLowerCase();
+          if (!hay.includes(searchTerm)) return false;
+        }
+        if (lobFilter !== 'all' && agent.dept !== lobFilter) return false;
+        if (supFilter !== 'all' && agent.supervisor !== supFilter) return false;
+
+        if (statusFilter === 'new_hire' && agent.tenureGroup !== 'New') return false;
+        if (statusFilter === 'old_staff' && agent.tenureGroup === 'New') return false;
+        if (statusFilter === 'eligible' && !calc.isEligible) return false;
+        if (statusFilter === 'probation' && calc.isEligible) return false;
+        if (statusFilter === 'tier1' && calc.rateTier !== 'tier1') return false;
+        if (statusFilter === 'tier2' && calc.rateTier !== 'tier2') return false;
+        if (statusFilter === 'exceptional' && calc.rateTier !== 'exceptional') return false;
+        if (statusFilter === 'negative' && calc.remainingBalance >= 0) return false;
+        return true;
+      });
+
+      document.getElementById('roster-count-badge').textContent = `${filtered.length} / ${agents.length}`;
+      const tbody = document.getElementById('agents-tbody');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="py-12 text-center text-slate-500 dark:text-neutral-400">
+              <i class="fa-solid fa-users-slash text-2xl mb-2 opacity-50 block"></i>
+              No agents match your current filter criteria.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(({ agent, calc }) => {
+        const tenureBadge = agent.tenureGroup === 'New'
+          ? '<span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800">New</span>'
+          : '<span class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-slate-100 text-slate-600 dark:bg-neutral-800 dark:text-neutral-400">Staff</span>';
+
+        let rateBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">1.25 / mo</span>';
+        if (calc.rateTier === 'exceptional') {
+          rateBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">2.50 / mo</span>';
+        } else if (calc.rateTier === 'tier2') {
+          rateBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">1.75 / mo</span>';
+        }
+
+        const eligBadge = calc.isEligible
+          ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><i class="fa-solid fa-check text-[10px]"></i> Eligible</span>'
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><i class="fa-solid fa-clock text-[10px]"></i> Probation (${calc.daysUntilEligible}d)</span>`;
+
+        const remColor = calc.remainingBalance < 0
+          ? 'text-rose-600 dark:text-rose-400'
+          : (calc.remainingBalance > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-neutral-300');
+
+        return `
+          <tr class="hover:bg-slate-50/90 dark:hover:bg-neutral-800/40 transition tabular-nums">
+            <td class="py-3 px-4">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300">${escapeHtml(agent.empId)}</span>
+                <span class="font-semibold text-slate-900 dark:text-white">${escapeHtml(agent.name)}</span>
+                ${tenureBadge}
+              </div>
+              <div class="text-[11px] font-mono text-slate-400 dark:text-neutral-500 mt-0.5">${escapeHtml(agent.email || '')}</div>
+            </td>
+            <td class="py-3 px-3">
+              <div class="font-medium text-slate-800 dark:text-neutral-200 text-xs">${escapeHtml(agent.dept || '—')}</div>
+              <div class="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5"><i class="fa-solid fa-user-tie text-[10px] mr-1 opacity-70"></i>${escapeHtml(agent.supervisor || '—')}</div>
+            </td>
+            <td class="py-3 px-3">
+              <div class="text-xs font-medium text-slate-800 dark:text-neutral-200">${formatDisplayDate(agent.joinDate)}</div>
+              <div class="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">${calc.tenureYears}y ${calc.tenureMonths}m &bull; 1st: ${formatMilestoneLabel(calc.firstPayoutDate)}</div>
+            </td>
+            <td class="py-3 px-3">${rateBadge}</td>
+            <td class="py-3 px-3">${eligBadge}</td>
+            <td class="py-3 px-3 text-right font-bold text-blue-600 dark:text-blue-400">${formatNumber(calc.totalAccrued)}</td>
+            <td class="py-3 px-3">
+              <div class="flex items-center justify-center gap-1.5">
+                <button type="button" onclick="adjustAgentUsedDays('${agent.id}', -0.5)" ${is2027Cycle ? 'disabled' : ''}
+                  class="w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 disabled:opacity-40 text-slate-700 dark:text-neutral-200 text-xs font-bold flex items-center justify-center transition" title="-0.5 day">−</button>
+                <span class="w-11 text-center font-semibold text-rose-600 dark:text-rose-400">${formatNumber(calc.totalUsed)}</span>
+                <button type="button" onclick="adjustAgentUsedDays('${agent.id}', 0.5)" ${is2027Cycle ? 'disabled' : ''}
+                  class="w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 disabled:opacity-40 text-slate-700 dark:text-neutral-200 text-xs font-bold flex items-center justify-center transition" title="+0.5 day">+</button>
+              </div>
+            </td>
+            <td class="py-3 px-3 text-right font-extrabold text-base ${remColor}">${formatNumber(calc.remainingBalance)}</td>
+            <td class="py-3 px-4 text-right">
+              <div class="inline-flex items-center gap-1">
+                <button type="button" onclick="openBreakdownModal('${agent.id}')" class="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 transition" title="View Monthly Ledger">
+                  <i class="fa-solid fa-list-check text-xs"></i>
+                </button>
+                <button type="button" onclick="openAgentModal('${agent.id}')" class="p-1.5 rounded-lg text-slate-600 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-neutral-800 transition" title="Edit Agent">
+                  <i class="fa-solid fa-pen-to-square text-xs"></i>
+                </button>
+                <button type="button" onclick="confirmDeleteAgent('${agent.id}')" class="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition" title="Delete Agent">
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function adjustAgentUsedDays(agentId, delta) {
+      if (activePreset === 'cycle_2027') return;
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) return;
+      if (!agent.monthlyTaken || typeof agent.monthlyTaken !== 'object') agent.monthlyTaken = {};
+
+      const current2026 = Object.values(agent.monthlyTaken).reduce((acc, v) => acc + (Number(v) || 0), 0);
+      const nextTotal = Math.max(0, Math.round((current2026 + delta) * 100) / 100);
+      agent.monthlyTaken = nextTotal > 0 ? { '2026-02': nextTotal } : {};
+      saveAgents();
+      renderDashboard();
+    }
+
+    // =========================================================================
+    // 5. MODALS: SCHEDULE, ADD/EDIT AGENT, BREAKDOWN LEDGER, GOOGLE SHEETS
+    // =========================================================================
+    function openScheduleModal(tab = '2026') {
+      document.getElementById('schedule-modal').classList.remove('hidden');
+      switchScheduleTab(tab);
+    }
+
+    function closeScheduleModal() {
+      document.getElementById('schedule-modal').classList.add('hidden');
+    }
+
+    function switchScheduleTab(tab) {
+      currentScheduleTab = tab === '2027' ? '2027' : '2026';
+      const tab2026 = document.getElementById('sched-tab-2026');
+      const tab2027 = document.getElementById('sched-tab-2027');
+      const banner = document.getElementById('schedule-tab-banner');
+      const totalLabel = document.getElementById('schedule-total-label');
+      const tbody = document.getElementById('schedule-reference-tbody');
+
+      const activeTabCls = 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-blue-800 text-white bg-blue-900 transition';
+      const inactiveTabCls = 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition';
+
+      tab2026.className = currentScheduleTab === '2026' ? activeTabCls : inactiveTabCls;
+      tab2027.className = currentScheduleTab === '2027' ? activeTabCls : inactiveTabCls;
+
+      const milestones2026 = [
+        'By 1-Feb-26', 'By 1-Mar-26', 'By 1-Apr-26', 'By 1-May-26',
+        'By 1-Jun-26', 'By 1-Jul-26', 'By 1-Aug-26', 'By 1-Sep-26',
+        'By 1-Oct-26', 'By 1-Nov-26', 'By 1-Dec-26', 'By 1-Jan-27'
+      ];
+      const milestones2027 = [
+        'By 1-Feb-27', 'By 1-Mar-27', 'By 1-Apr-27', 'By 1-May-27',
+        'By 1-Jun-27', 'By 1-Jul-27', 'By 1-Aug-27', 'By 1-Sep-27',
+        'By 1-Oct-27', 'By 1-Nov-27', 'By 1-Dec-27', 'By 1-Jan-28'
+      ];
+
+      const list = currentScheduleTab === '2027' ? milestones2027 : milestones2026;
+      banner.innerHTML = currentScheduleTab === '2027'
+        ? '<strong>2027 Reset Cycle:</strong> Starts fresh on <strong>By 1-Feb-27</strong> through <strong>By 1-Jan-28</strong> (15 / 21 / 30 days).'
+        : '<strong>Fixed 2026 Logic:</strong> 12 milestones from <strong>By 1-Feb-26</strong> through <strong>By 1-Jan-27</strong> (15 / 21 / 30 days).';
+      totalLabel.textContent = currentScheduleTab === '2027' ? 'Total 2027' : 'Total 2026';
+
+      tbody.innerHTML = list.map((m, idx) => {
+        const n = idx + 1;
+        return `
+          <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+            <td class="py-2 px-4 font-semibold text-neutral-800 dark:text-neutral-200">${m}</td>
+            <td class="py-2 px-3 text-center text-blue-700 dark:text-blue-300 font-medium">${formatNumber(n * 1.25)}</td>
+            <td class="py-2 px-3 text-center text-emerald-700 dark:text-emerald-300 font-medium">${formatNumber(n * 1.75)}</td>
+            <td class="py-2 px-4 text-center text-purple-700 dark:text-purple-300 font-medium">${formatNumber(n * 2.5)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openAgentModal(agentId = null) {
+      const modal = document.getElementById('agent-modal');
+      const title = document.getElementById('modal-title');
+      document.getElementById('agent-form').reset();
+      document.getElementById('agent-id').value = '';
+
+      if (agentId) {
+        const agent = agents.find(a => a.id === agentId);
+        if (!agent) return;
+        title.textContent = `Edit Agent — ${agent.name}`;
+        document.getElementById('agent-id').value = agent.id;
+        document.getElementById('agent-emp-id').value = agent.empId || '';
+        document.getElementById('agent-name').value = agent.name || '';
+        document.getElementById('agent-dept').value = agent.dept || '';
+        document.getElementById('agent-supervisor').value = agent.supervisor || '';
+        document.getElementById('agent-join-date').value = agent.joinDate || '2026-01-01';
+        const totalUsed = Object.values(agent.monthlyTaken || {}).reduce((acc, v) => acc + (Number(v) || 0), 0);
+        document.getElementById('agent-used').value = totalUsed;
+        document.getElementById('agent-login-user').value = agent.email || agent.username || '';
+        document.getElementById('agent-login-pass').value = agent.password || DEFAULT_AGENT_PASS;
+        document.getElementById('agent-exceptional').checked = Boolean(agent.isExceptional);
+      } else {
+        title.textContent = 'Add Team Agent';
+        document.getElementById('agent-join-date').value = TODAY_ISO;
+        document.getElementById('agent-used').value = '0';
+        document.getElementById('agent-login-pass').value = DEFAULT_AGENT_PASS;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeAgentModal() {
+      document.getElementById('agent-modal').classList.add('hidden');
+    }
+
+    function resetAgentFirstTimePasswordInModal() {
+      document.getElementById('agent-login-pass').value = DEFAULT_AGENT_PASS;
+      showToast(`Reset password field to ${DEFAULT_AGENT_PASS}`);
+    }
+
+    function saveAgent(event) {
+      event.preventDefault();
+      const existingId = document.getElementById('agent-id').value;
+      const empId = document.getElementById('agent-emp-id').value.trim();
+      const name = document.getElementById('agent-name').value.trim();
+      const dept = document.getElementById('agent-dept').value.trim() || 'Operations';
+      const supervisor = document.getElementById('agent-supervisor').value.trim() || '—';
+      const joinDate = document.getElementById('agent-join-date').value;
+      const usedDays = Math.max(0, Number(document.getElementById('agent-used').value) || 0);
+      const emailOrUser = document.getElementById('agent-login-user').value.trim();
+      const password = document.getElementById('agent-login-pass').value.trim() || DEFAULT_AGENT_PASS;
+      const isExceptional = document.getElementById('agent-exceptional').checked;
+
+      if (existingId) {
+        const agent = agents.find(a => a.id === existingId);
+        if (agent) {
+          agent.empId = empId;
+          agent.name = name;
+          agent.dept = dept;
+          agent.supervisor = supervisor;
+          agent.joinDate = joinDate;
+          agent.isExceptional = isExceptional;
+          if (emailOrUser.includes('@')) {
+            agent.email = emailOrUser;
+          } else if (emailOrUser) {
+            agent.username = emailOrUser;
+          }
+          agent.password = password;
+          agent.passwordUpdated = password !== DEFAULT_AGENT_PASS;
+          agent.monthlyTaken = usedDays > 0 ? { '2026-02': usedDays } : {};
+        }
+        showToast(`Updated ${name}`);
+      } else {
+        const newAgent = {
+          id: `agent_${empId}_${Date.now()}`,
+          empId,
+          name,
+          email: emailOrUser.includes('@') ? emailOrUser : buildDefaultEmail(name, empId),
+          dept,
+          supervisor,
+          joinDate,
+          tenureGroup: joinDate >= '2026-09-01' ? 'New' : 'Old',
+          isExceptional,
+          forceSeniorRate: false,
+          username: buildDefaultUsername(name, empId),
+          password,
+          passwordUpdated: password !== DEFAULT_AGENT_PASS,
+          monthlyTaken: usedDays > 0 ? { '2026-02': usedDays } : {}
+        };
+        agents.push(newAgent);
+        showToast(`Added ${name} to roster`);
+      }
+
+      saveAgents();
+      closeAgentModal();
+      renderDashboard();
+    }
+
+    function confirmDeleteAgent(agentId) {
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) return;
+      document.getElementById('confirm-title').textContent = `Delete ${agent.name}?`;
+      document.getElementById('confirm-message').textContent = `Are you sure you want to remove #${agent.empId} (${agent.name}) from the leave roster?`;
+      pendingConfirmCallback = () => {
+        agents = agents.filter(a => a.id !== agentId);
+        saveAgents();
+        renderDashboard();
+        showToast(`Removed ${agent.name}`);
+      };
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function openResetConfirm() {
+      document.getElementById('confirm-title').textContent = 'Reset Default 52-Agent Roster?';
+      document.getElementById('confirm-message').textContent = 'This will restore the default 52 agents, their default taken days, and reset passwords to Tempo@123.';
+      pendingConfirmCallback = () => {
+        agents = getDefaultAgents();
+        saveAgents();
+        renderDashboard();
+        showToast('Roster reset to default 52 agents');
+      };
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      pendingConfirmCallback = null;
+    }
+
+    function openBreakdownModal(agentId) {
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) return;
+      const refDateISO = getActiveReferenceDateISO();
+      const refDate = parseLocalDate(refDateISO);
+      const calc = calculateAgentLeave(agent, refDate);
+
+      document.getElementById('breakdown-title').textContent = `#${agent.empId} ${agent.name} — Milestone Ledger`;
+      document.getElementById('breakdown-subtitle').textContent = `${agent.dept} • Supervisor: ${agent.supervisor} • Hired ${formatDisplayDate(agent.joinDate)}`;
+
+      document.getElementById('breakdown-summary').innerHTML = `
+        <div><span class="text-neutral-500 block">Accrued</span><strong class="text-blue-600 dark:text-blue-400 text-sm">${formatNumber(calc.totalAccrued)} d</strong></div>
+        <div><span class="text-neutral-500 block">Taken</span><strong class="text-rose-600 dark:text-rose-400 text-sm">${formatNumber(calc.totalUsed)} d</strong></div>
+        <div><span class="text-neutral-500 block">Remaining</span><strong class="text-emerald-600 dark:text-emerald-400 text-sm">${formatNumber(calc.remainingBalance)} d</strong></div>
+        <div><span class="text-neutral-500 block">1st Payout</span><strong class="text-neutral-800 dark:text-neutral-200 text-sm">${formatMilestoneLabel(calc.firstPayoutDate)}</strong></div>
+      `;
+
+      const tbody = document.getElementById('breakdown-tbody');
+      if (calc.ledger.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-xs text-neutral-500">No milestones reached yet for the selected date filter.</td></tr>';
+      } else {
+        tbody.innerHTML = calc.ledger.map(row => `
+          <tr>
+            <td class="py-2 px-3 font-semibold text-neutral-800 dark:text-neutral-200">${row.milestoneLabel}</td>
+            <td class="py-2 px-3 text-xs text-neutral-600 dark:text-neutral-400">${row.tierLabel}</td>
+            <td class="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">+${formatNumber(row.rate)}</td>
+            <td class="py-2 px-3 text-center">
+              <input type="number" step="0.25" min="0" value="${row.taken}" ${calc.is2027Cycle ? 'disabled' : ''}
+                onchange="updateAgentMonthTaken('${agent.id}', '${row.ym}', this.value)"
+                class="w-20 px-2 py-1 text-center text-xs font-semibold bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg text-rose-600 dark:text-rose-400">
+            </td>
+            <td class="py-2 px-3 text-right font-bold text-neutral-900 dark:text-white">${formatNumber(row.cumulativeAccrued)}</td>
+          </tr>
+        `).join('');
+      }
+
+      document.getElementById('breakdown-modal').classList.remove('hidden');
+    }
+
+    function updateAgentMonthTaken(agentId, ym, val) {
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) return;
+      if (!agent.monthlyTaken || typeof agent.monthlyTaken !== 'object') agent.monthlyTaken = {};
+      const num = Math.max(0, Number(val) || 0);
+      if (num > 0) agent.monthlyTaken[ym] = num;
+      else delete agent.monthlyTaken[ym];
+      saveAgents();
+      renderDashboard();
+      openBreakdownModal(agentId);
+    }
+
+    function closeBreakdownModal() {
+      document.getElementById('breakdown-modal').classList.add('hidden');
+    }
+
+    // =========================================================================
+    // 6. GOOGLE SHEETS SYNC & CSV EXPORTS
+    // =========================================================================
+    function toggleExportMenu(event) {
+      event.stopPropagation();
+      document.getElementById('export-menu').classList.toggle('hidden');
+    }
+
+    function closeExportMenu() {
+      const menu = document.getElementById('export-menu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    function openSheetsModal() {
+      document.getElementById('sheets-modal').classList.remove('hidden');
+    }
+
+    function closeSheetsModal() {
+      document.getElementById('sheets-modal').classList.add('hidden');
+    }
+
+    function parseDelimitedText(raw) {
+      const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) return [];
+      const delimiter = lines[0].includes('\t') ? '\t' : ',';
+      const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
+      const idIdx = headers.findIndex(h => h === 'id' || h === 'empid' || h === 'employee id');
+      const nameIdx = headers.findIndex(h => h === 'name' || h === 'agent' || h === 'employee');
+      const takenIdx = headers.findIndex(h => h.includes('taken') || h.includes('used') || h.includes('consumed'));
+
+      const results = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(delimiter).map(c => c.trim());
+        const empId = idIdx >= 0 ? cols[idIdx] : '';
+        const name = nameIdx >= 0 ? cols[nameIdx] : '';
+        const taken = takenIdx >= 0 ? (parseFloat(cols[takenIdx]) || 0) : 0;
+        const matched = agents.find(a =>
+          (empId && String(a.empId).toLowerCase() === empId.toLowerCase()) ||
+          (name && a.name.toLowerCase() === name.toLowerCase())
+        );
+        if (matched) {
+          results.push({ agent: matched, taken });
+        }
+      }
+      return results;
+    }
+
+    function previewPastedSheetData() {
+      const raw = document.getElementById('gsheet-paste-area').value || '';
+      parsedSheetRows = parseDelimitedText(raw);
+      const previewBox = document.getElementById('gsheet-preview-box');
+      const applyBtn = document.getElementById('gsheet-apply-btn');
+
+      if (parsedSheetRows.length === 0) {
+        previewBox.classList.add('hidden');
+        applyBtn.disabled = true;
+        return;
+      }
+
+      previewBox.classList.remove('hidden');
+      applyBtn.disabled = false;
+      document.getElementById('gsheet-preview-summary').textContent = `${parsedSheetRows.length} matched agent row(s) ready to sync`;
+      document.getElementById('gsheet-preview-thead').innerHTML = '<tr><th class="py-2 px-3">ID</th><th class="py-2 px-3">Agent</th><th class="py-2 px-3 text-right">Synced Taken Days</th></tr>';
+      document.getElementById('gsheet-preview-tbody').innerHTML = parsedSheetRows.slice(0, 15).map(r => `
+        <tr>
+          <td class="py-1.5 px-3 font-mono">${escapeHtml(r.agent.empId)}</td>
+          <td class="py-1.5 px-3 font-medium">${escapeHtml(r.agent.name)}</td>
+          <td class="py-1.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400">${formatNumber(r.taken)}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function fetchFromGoogleSheetURL() {
+      const url = (document.getElementById('gsheet-url-input').value || '').trim();
+      const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match) {
+        showToast('Enter a valid Google Sheets URL', true);
+        return;
+      }
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+      try {
+        const res = await fetch(csvUrl);
+        if (!res.ok) throw new Error('Fetch failed');
+        const text = await res.text();
+        document.getElementById('gsheet-paste-area').value = text;
+        previewPastedSheetData();
+        showToast('Sheet loaded into preview');
+      } catch (e) {
+        showToast('Could not fetch sheet directly. Copy & paste cells into Option B.', true);
+      }
+    }
+
+    function applyGoogleSheetsImport() {
+      if (parsedSheetRows.length === 0) return;
+      const mode = document.querySelector('input[name="sync-mode"]:checked')?.value || 'overwrite';
+
+      parsedSheetRows.forEach(({ agent, taken }) => {
+        const existing = Object.values(agent.monthlyTaken || {}).reduce((acc, v) => acc + (Number(v) || 0), 0);
+        const finalVal = mode === 'add' ? existing + taken : taken;
+        agent.monthlyTaken = finalVal > 0 ? { '2026-02': Math.round(finalVal * 100) / 100 } : {};
+      });
+
+      saveAgents();
+      renderDashboard();
+      closeSheetsModal();
+      showToast(`Synced ${parsedSheetRows.length} agent records`);
+    }
+
+    function handleCSVFileUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById('gsheet-paste-area').value = String(e.target?.result || '');
+        previewPastedSheetData();
+      };
+      reader.readAsText(file);
+    }
+
+    function triggerDownload(filename, content, mime = 'text/csv;charset=utf-8;') {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadConsumedTemplateCSV() {
+      const rows = [['ID', 'Name', 'Taken 2026'], ...agents.map(a => [a.empId, `"${a.name}"`, Object.values(a.monthlyTaken || {}).reduce((s, v) => s + (Number(v) || 0), 0)])];
+      triggerDownload('tempo_leave_sync_template.csv', rows.map(r => r.join(',')).join('\n'));
+    }
+
+    function exportSummaryCSV() {
+      const refDate = parseLocalDate(getActiveReferenceDateISO());
+      const rows = [['Tenure', 'ID', 'Name', 'Email', 'LOB', 'Supervisor', 'Hiring Date', 'Rate', 'Eligibility', 'Deserved', 'Taken', 'Remaining']];
+      agents.forEach(agent => {
+        const c = calculateAgentLeave(agent, refDate);
+        rows.push([
+          agent.tenureGroup,
+          agent.empId,
+          `"${agent.name}"`,
+          agent.email,
+          `"${agent.dept}"`,
+          `"${agent.supervisor}"`,
+          agent.joinDate,
+          formatNumber(c.currentRate),
+          c.isEligible ? 'Eligible' : 'Probation',
+          formatNumber(c.totalAccrued),
+          formatNumber(c.totalUsed),
+          formatNumber(c.remainingBalance)
+        ]);
+      });
+      triggerDownload(`tempo_leave_summary_${getActiveReferenceDateISO()}.csv`, rows.map(r => r.join(',')).join('\n'));
+      showToast('Exported Summary CSV');
+    }
+
+    function exportDetailedLedgerCSV() {
+      const refDate = parseLocalDate(getActiveReferenceDateISO());
+      const rows = [['ID', 'Name', 'Milestone', 'Tier', 'Accrued', 'Taken', 'Cumulative Accrued']];
+      agents.forEach(agent => {
+        const c = calculateAgentLeave(agent, refDate);
+        c.ledger.forEach(m => {
+          rows.push([agent.empId, `"${agent.name}"`, m.milestoneLabel, `"${m.tierLabel}"`, formatNumber(m.rate), formatNumber(m.taken), formatNumber(m.cumulativeAccrued)]);
+        });
+      });
+      triggerDownload(`tempo_leave_ledger_${getActiveReferenceDateISO()}.csv`, rows.map(r => r.join(',')).join('\n'));
+      showToast('Exported Milestone Ledger CSV');
+    }
+
+    function exportCredentialsCSV() {
+      const rows = [['ID', 'Name', 'Work Email', 'Username', 'Password Status']];
+      agents.forEach(a => {
+        rows.push([a.empId, `"${a.name}"`, a.email, a.username, a.passwordUpdated ? 'Custom Password Set' : 'Default (Tempo@123)']);
+      });
+      triggerDownload('tempo_agent_emails_status.csv', rows.map(r => r.join(',')).join('\n'));
+      showToast('Exported Agent Emails & Status CSV');
+    }
+
+    function copyForGoogleSheets() {
+      const refDate = parseLocalDate(getActiveReferenceDateISO());
+      const lines = [['Tenure', 'ID', 'Name', 'LOB', 'Supervisor', 'Hiring Date', 'Status', 'Deserved', 'Taken', 'Remaining'].join('\t')];
+      agents.forEach(agent => {
+        const c = calculateAgentLeave(agent, refDate);
+        lines.push([
+          agent.tenureGroup,
+          agent.empId,
+          agent.name,
+          agent.dept,
+          agent.supervisor,
+          agent.joinDate,
+          c.isEligible ? 'Eligible' : 'Probation',
+          formatNumber(c.totalAccrued),
+          formatNumber(c.totalUsed),
+          formatNumber(c.remainingBalance)
+        ].join('\t'));
+      });
+      const ta = document.createElement('textarea');
+      ta.value = lines.join('\n');
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('Copied table for Google Sheets (Ctrl+V)');
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const icon = document.getElementById('toast-icon');
+      const text = document.getElementById('toast-text');
+      if (!toast || !text) return;
+      text.textContent = message;
+      if (icon) {
+        icon.className = isError
+          ? 'fa-solid fa-circle-exclamation text-rose-400'
+          : 'fa-solid fa-circle-check text-emerald-400';
+      }
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // =========================================================================
+    // 7. INITIALIZATION
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      loadAgents();
+      loadAuthSession();
+
+      const confirmBtn = document.getElementById('confirm-action-btn');
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          if (typeof pendingConfirmCallback === 'function') pendingConfirmCallback();
+          closeConfirmModal();
+        });
+      }
+
+      document.addEventListener('click', () => closeExportMenu());
+      selectLoginRole('agent');
+      syncDatePresetButtons();
+      applyRoleUI();
+    });
+  </script>
+</body>
+</html>
