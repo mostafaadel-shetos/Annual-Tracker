@@ -158,7 +158,7 @@
 
         <!-- Step 1: Unified Work Email Sign-In Form -->
         <div id="login-step-signin" class="space-y-5">
-          <form onsubmit="handleUnifiedLogin(event)" class="space-y-4">
+          <form onsubmit="handleUnifiedLogin(event)" novalidate class="space-y-4">
             <div>
               <label id="login-username-label" for="login-username-input" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
                 Work Email Address
@@ -167,6 +167,9 @@
                 <i class="fa-solid fa-envelope text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 text-sm"></i>
                 <input type="email" id="login-username-input" required autocomplete="email"
                   oninput="checkAgentFirstTimeEmailStatus()"
+                  onchange="checkAgentFirstTimeEmailStatus()"
+                  onkeyup="checkAgentFirstTimeEmailStatus()"
+                  onblur="checkAgentFirstTimeEmailStatus()"
                   placeholder="e.g., mostafa.adel@tempo.fit"
                   class="w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
               </div>
@@ -1517,10 +1520,62 @@
     // =========================================================================
     // 3. UNIFIED EMAIL SIGN-IN, 1ST-TIME PASSWORD SETUP & SESSION ROUTING
     // =========================================================================
+    function isTempoEmail(email) {
+      const clean = String(email || '').trim().toLowerCase();
+      return /^[a-z0-9._%+-]+@tempo\.fit$/.test(clean);
+    }
+
+    function createAutoProvisionedTempoUser(email) {
+      const clean = String(email || '').trim().toLowerCase();
+      const localPart = clean.split('@')[0] || 'team.member';
+      const displayName = localPart
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ') || 'Tempo Team Member';
+
+      const maxId = agents.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
+      const maxEmpNum = agents.reduce((m, a) => {
+        const num = parseInt(String(a.empId || '').replace(/\D/g, ''), 10);
+        return isNaN(num) ? m : Math.max(m, num);
+      }, 922);
+
+      const newUser = {
+        id: maxId + 1,
+        empId: String(maxEmpNum + 1),
+        name: displayName,
+        email: clean,
+        dept: 'MX',
+        supervisor: '',
+        joinDate: '2026-11-01',
+        usedDays: 0,
+        casualUsedDays: 0,
+        usedDays2027: 0,
+        casualUsedDays2027: 0,
+        monthlyUsed: {},
+        monthlyCasualUsed: {},
+        isExceptional: false,
+        accessRole: 'agent',
+        noLeaveBalance: false,
+        customPassword: '',
+        tenureGroup: 'New'
+      };
+
+      agents.push(newUser);
+      saveAgents();
+      return newUser;
+    }
+
     function findUserByEmail(email) {
       const clean = String(email || '').trim().toLowerCase();
       if (!clean) return null;
       return agents.find(a => String(a.email || '').trim().toLowerCase() === clean) || null;
+    }
+
+    function isFirstTimeUser(user) {
+      if (!user) return false;
+      const pwd = String(user.customPassword || '').trim();
+      return !pwd || pwd === 'Tempo@123';
     }
 
     function checkAgentFirstTimeEmailStatus() {
@@ -1531,8 +1586,11 @@
       const errorBox = document.getElementById('login-error-msg');
       if (errorBox) errorBox.classList.add('hidden');
 
-      const user = findUserByEmail(emailInput ? emailInput.value : '');
-      if (user && !user.customPassword) {
+      const rawEmail = emailInput ? emailInput.value.trim() : '';
+      const user = findUserByEmail(rawEmail);
+      const canFirstTimeSetup = (user && isFirstTimeUser(user)) || (!user && isTempoEmail(rawEmail));
+
+      if (canFirstTimeSetup) {
         if (pwdGroup) pwdGroup.classList.add('hidden');
         if (banner) banner.classList.remove('hidden');
         if (submitText) submitText.textContent = 'Continue to Create Password';
@@ -1557,32 +1615,65 @@
     }
 
     function handleUnifiedLogin(event) {
-      event.preventDefault();
+      if (event) event.preventDefault();
       const emailInput = document.getElementById('login-username-input');
       const pwdInput = document.getElementById('login-password-input');
       const errorBox = document.getElementById('login-error-msg');
       const errorText = document.getElementById('login-error-text');
 
-      const user = findUserByEmail(emailInput ? emailInput.value : '');
-      if (!user) {
-        if (errorText) errorText.textContent = 'Work email not found. Please enter your @tempo.fit email.';
+      if (!agents || agents.length === 0) {
+        agents = loadAgents();
+      }
+
+      const rawEmail = emailInput ? emailInput.value.trim().toLowerCase() : '';
+      if (!rawEmail) {
+        if (errorText) errorText.textContent = 'Please enter your @tempo.fit work email address.';
         if (errorBox) errorBox.classList.remove('hidden');
+        if (emailInput) emailInput.focus();
         return;
       }
 
-      if (!user.customPassword) {
+      if (!isTempoEmail(rawEmail)) {
+        if (errorText) errorText.textContent = 'Please enter a valid @tempo.fit work email address.';
+        if (errorBox) errorBox.classList.remove('hidden');
+        if (emailInput) emailInput.focus();
+        return;
+      }
+
+      let user = findUserByEmail(rawEmail);
+      if (!user) {
+        user = createAutoProvisionedTempoUser(rawEmail);
+      }
+
+      if (isFirstTimeUser(user)) {
+        if (errorBox) errorBox.classList.add('hidden');
         pendingSetupUserId = user.id;
-        document.getElementById('setup-agent-name').textContent = `${user.name} (#${user.empId})`;
-        document.getElementById('setup-agent-email').textContent = user.email;
-        document.getElementById('setup-new-password').value = '';
-        document.getElementById('setup-confirm-password').value = '';
-        document.getElementById('setup-pwd-error').classList.add('hidden');
-        document.getElementById('login-step-signin').classList.add('hidden');
-        document.getElementById('login-step-create-pwd').classList.remove('hidden');
+        const setupNameEl = document.getElementById('setup-agent-name');
+        const setupEmailEl = document.getElementById('setup-agent-email');
+        const newPwdEl = document.getElementById('setup-new-password');
+        const confirmPwdEl = document.getElementById('setup-confirm-password');
+        const setupErrEl = document.getElementById('setup-pwd-error');
+        const stepSignin = document.getElementById('login-step-signin');
+        const stepCreate = document.getElementById('login-step-create-pwd');
+
+        if (setupNameEl) setupNameEl.textContent = `${user.name} (#${user.empId})`;
+        if (setupEmailEl) setupEmailEl.textContent = user.email;
+        if (newPwdEl) newPwdEl.value = '';
+        if (confirmPwdEl) confirmPwdEl.value = '';
+        if (setupErrEl) setupErrEl.classList.add('hidden');
+        if (stepSignin) stepSignin.classList.add('hidden');
+        if (stepCreate) stepCreate.classList.remove('hidden');
+        if (newPwdEl) setTimeout(() => newPwdEl.focus(), 50);
         return;
       }
 
       const enteredPwd = pwdInput ? pwdInput.value : '';
+      if (!enteredPwd) {
+        if (errorText) errorText.textContent = 'Please enter your password.';
+        if (errorBox) errorBox.classList.remove('hidden');
+        if (pwdInput) pwdInput.focus();
+        return;
+      }
       if (enteredPwd !== user.customPassword) {
         if (errorText) errorText.textContent = 'Incorrect password. Please try again.';
         if (errorBox) errorBox.classList.remove('hidden');
@@ -1593,9 +1684,9 @@
     }
 
     function handleFirstTimePasswordSetup(event) {
-      event.preventDefault();
-      const p1 = document.getElementById('setup-new-password').value;
-      const p2 = document.getElementById('setup-confirm-password').value;
+      if (event) event.preventDefault();
+      const p1 = (document.getElementById('setup-new-password')?.value || '').trim();
+      const p2 = (document.getElementById('setup-confirm-password')?.value || '').trim();
       const errEl = document.getElementById('setup-pwd-error');
 
       if (p1.length < 6) {
@@ -1610,7 +1701,11 @@
       }
 
       const user = agents.find(a => a.id === pendingSetupUserId);
-      if (!user) return;
+      if (!user) {
+        errEl.textContent = 'Session expired. Please go back and enter your email again.';
+        errEl.classList.remove('hidden');
+        return;
+      }
       user.customPassword = p1;
       saveAgents();
       pendingSetupUserId = null;
@@ -2729,6 +2824,7 @@
       initTheme();
       agents = loadAgents();
       populateDynamicFilters();
+      checkAgentFirstTimeEmailStatus();
     });
   </script>
 </body>
