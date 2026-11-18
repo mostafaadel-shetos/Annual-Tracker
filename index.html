@@ -1179,35 +1179,33 @@
     // 1. STATE, ROLE AUTH, THEME & DATE HELPERS
     // =========================================================================
     const STORAGE_KEY = 'annual_leave_tracker_v25_clean_roster';
+    const SESSION_STORAGE_KEY = 'annual_leave_tracker_active_session_v1';
     const THEME_STORAGE_KEY = 'leaveflow_tracker_theme';
     const TODAY_FIXED = new Date(2026, 10, 18); // 18 Nov 2026
+    const DEFAULT_USER_PASS = 'Tempo@123';
 
     let agents = [];
     let currentSessionUser = null;
     let pendingSetupUserId = null;
-    let activeDatePreset = 'today'; // 'today' | 'next_month' | 'full_2026' | 'cycle_2027'
-    let cycle2027MonthIndex = 0; // 0 = Feb 2027 .. 11 = Jan 2028
-    let analyticsYear = '2026';
+    let activePreset = 'today';
+    let cycle2027MonthOffset = 0;
+    let activeAnalyticsYear = '2026';
+    let currentScheduleTab = '2026';
+    let activeBreakdownAgentId = null;
     let parsedSheetRows = [];
 
     function initTheme() {
-      try {
-        const saved = localStorage.getItem(THEME_STORAGE_KEY);
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = saved ? saved === 'dark' : prefersDark;
-        document.documentElement.classList.toggle('dark', isDark);
-        updateThemeIcon(isDark);
-      } catch (e) {
-        updateThemeIcon(false);
-      }
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = saved ? saved === 'dark' : prefersDark;
+      document.documentElement.classList.toggle('dark', isDark);
+      updateThemeIcon(isDark);
     }
 
     function toggleTheme() {
       const isDark = !document.documentElement.classList.contains('dark');
       document.documentElement.classList.toggle('dark', isDark);
-      try {
-        localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : 'light');
-      } catch (e) {}
+      localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : 'light');
       updateThemeIcon(isDark);
     }
 
@@ -1219,52 +1217,50 @@
     }
 
     function getReferenceDate() {
-      if (activeDatePreset === 'next_month') {
-        return new Date(2026, 11, 1); // 01 Dec 2026
+      if (activePreset === 'next_month') {
+        return new Date(TODAY_FIXED.getFullYear(), TODAY_FIXED.getMonth() + 1, 1);
       }
-      if (activeDatePreset === 'full_2026') {
-        return new Date(2027, 0, 1); // 01 Jan 2027
+      if (activePreset === 'full_2026') {
+        return new Date(2027, 0, 1);
       }
-      if (activeDatePreset === 'cycle_2027') {
-        const idx = Number(cycle2027MonthIndex) || 0;
-        if (idx === 11) return new Date(2028, 0, 1);
-        return new Date(2027, 1 + idx, 1); // 01 Feb 2027 .. 01 Dec 2027
+      if (activePreset === 'cycle_2027') {
+        return new Date(2027, 1 + Number(cycle2027MonthOffset || 0), 1);
       }
-      return new Date(TODAY_FIXED.getTime());
+      return new Date(TODAY_FIXED.getFullYear(), TODAY_FIXED.getMonth(), TODAY_FIXED.getDate());
     }
 
-    function parseLocalDate(dateStr) {
-      if (!dateStr) return new Date(2026, 0, 1);
-      const parts = String(dateStr).split('-').map(Number);
-      if (parts.length !== 3 || parts.some(isNaN)) return new Date(2026, 0, 1);
-      return new Date(parts[0], parts[1] - 1, parts[2]);
-    }
-
-    function addMonthsClamped(dateObj, monthsToAdd) {
-      const targetYear = dateObj.getFullYear() + Math.floor((dateObj.getMonth() + monthsToAdd) / 12);
-      const targetMonth = (dateObj.getMonth() + monthsToAdd) % 12;
-      const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
-      return new Date(targetYear, targetMonth, Math.min(dateObj.getDate(), lastDay));
+    function parseLocalDate(str) {
+      if (!str) return new Date(2026, 0, 1);
+      const parts = String(str).split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? new Date(2026, 0, 1) : d;
     }
 
     function getFirstPayoutDate(joinDate) {
-      const day = joinDate.getDate();
-      const offsetMonths = day > 25 ? 2 : 1;
-      return new Date(joinDate.getFullYear(), joinDate.getMonth() + offsetMonths, 1);
+      const monthOffset = joinDate.getDate() > 25 ? 2 : 1;
+      return new Date(joinDate.getFullYear(), joinDate.getMonth() + monthOffset, 1);
     }
 
-    function formatDisplayDate(dateObj) {
-      if (!(dateObj instanceof Date) || isNaN(dateObj)) return '—';
+    function addMonthsClamped(date, months) {
+      const targetYear = date.getFullYear();
+      const targetMonth = date.getMonth() + months;
+      const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      return new Date(targetYear, targetMonth, Math.min(date.getDate(), lastDay));
+    }
+
+    function formatDisplayDate(date) {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const d = String(dateObj.getDate()).padStart(2, '0');
-      const m = months[dateObj.getMonth()];
-      const y = dateObj.getFullYear();
-      return `${d}-${m}-${y}`;
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${d}-${months[date.getMonth()]}-${String(date.getFullYear()).slice(-2)}`;
     }
 
-    function formatNum(val) {
-      const num = Number(val || 0);
-      return Number.isInteger(num) ? String(num) : num.toFixed(2).replace(/\.00$/, '');
+    function formatNum(num) {
+      const val = Number(num || 0);
+      if (Math.abs(val) < 0.001) return '0';
+      return Number.isInteger(val) ? String(val) : val.toFixed(2).replace(/\.?0+$/, '');
     }
 
     function escapeHtml(str) {
@@ -1277,415 +1273,322 @@
     }
 
     let toastTimer = null;
-    function showToast(message, type = 'success') {
+    function showToast(message, isError = false) {
       const toast = document.getElementById('toast');
-      const text = document.getElementById('toast-text');
       const icon = document.getElementById('toast-icon');
-      if (!toast || !text || !icon) return;
+      const text = document.getElementById('toast-text');
+      if (!toast || !text) return;
       text.textContent = message;
-      icon.className = type === 'error'
-        ? 'fa-solid fa-circle-exclamation text-rose-400'
-        : 'fa-solid fa-circle-check text-emerald-400';
+      if (icon) {
+        icon.className = isError
+          ? 'fa-solid fa-circle-exclamation text-rose-400'
+          : 'fa-solid fa-circle-check text-emerald-400';
+      }
       toast.classList.remove('translate-y-20', 'opacity-0');
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => {
         toast.classList.add('translate-y-20', 'opacity-0');
-      }, 2800);
+      }, 3200);
+    }
+
+    // =========================================================================
+    // 2. ROSTER DATA & STORAGE PERSISTENCE
+    // =========================================================================
+    function generateDefaultEmail(name) {
+      const clean = String(name || 'user').trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
+      const parts = clean.split(/\s+/).filter(Boolean);
+      if (parts.length === 0) return 'user@tempo.fit';
+      if (parts.length === 1) return `${parts[0]}@tempo.fit`;
+      return `${parts[0]}.${parts[parts.length - 1]}@tempo.fit`;
     }
 
     function getDefaultAgents() {
       const raw = [
-        { empId: '234', name: 'Khaled El Sabban', email: 'khaledsabban@tempo.fit', emailAliases: ['khaled.elsabban@tempo.fit', 'elsabban@tempo.fit', 'sabban@tempo.fit'], dept: 'Operation Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-06-23', usedDays: 10, isExceptional: true, tenureGroup: 'Old' },
-        { empId: '530', name: 'Job James', email: 'job.james@tempo.fit', emailAliases: ['job@tempo.fit', 'james@tempo.fit'], dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 3, tenureGroup: 'Old' },
-        { empId: '218', name: 'Ahmed Elsawy', email: 'ahmed.elsawy@tempo.fit', emailAliases: ['sawy@tempo.fit', 'elsawy@tempo.fit'], dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7, tenureGroup: 'Old' },
-        { empId: '209', name: 'Ahmed Mahmoud', email: 'ahmed.mahmoud@tempo.fit', dept: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7, tenureGroup: 'Old' },
-        { empId: '224', name: 'Lina Hesham', email: 'linahesham@tempo.fit', emailAliases: ['lina.hesham@tempo.fit', 'lina@tempo.fit', 'hesham@tempo.fit'], dept: 'Social', supervisor: 'Mohamed Mounir', joinDate: '2024-06-03', usedDays: 8, tenureGroup: 'Old' },
-        { empId: '531', name: 'Ariath Piol', email: 'ariath.piol@tempo.fit', emailAliases: ['ariath@tempo.fit', 'piol@tempo.fit'], dept: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 8, tenureGroup: 'Old' },
-        { empId: '805', name: 'Rima Zaki', email: 'rima.khaled@tempo.fit', emailAliases: ['rima.zaki@tempo.fit', 'rima@tempo.fit', 'zaki@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2023-11-13', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '180', name: 'Mohamed Mounir', email: 'mohamed.abdelmagid@tempo.fit', emailAliases: ['mohamed.mounir@tempo.fit', 'mounir@tempo.fit'], dept: 'Change Integration Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-04-05', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '832', name: 'Ahmed Abdelghany', email: 'ahmed.abdelghany@tempo.fit', emailAliases: ['abdelghany@tempo.fit'], dept: 'QA', supervisor: 'Heba El Sobky', joinDate: '2024-08-05', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '476', name: 'Hassan Khallaf', email: 'hassan@tempo.fit', emailAliases: ['hassan.khallaf@tempo.fit', 'khallaf@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-03-07', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '174', name: 'Mohab Magdy', email: 'mohab.magdy@tempo.fit', emailAliases: ['mohab@tempo.fit', 'magdy@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2021-04-05', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '792', name: 'Rashad Mohamed', email: 'rashad.mohamed@tempo.fit', emailAliases: ['rashad@tempo.fit'], dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-03-13', usedDays: 9, tenureGroup: 'Old' },
-        { empId: '522', name: 'Mostafa Adel', email: 'mostafa.adel@tempo.fit', emailAliases: ['adel@tempo.fit'], dept: 'Workforce Analyst', supervisor: 'Mohamed Halim', joinDate: '2022-07-25', usedDays: 10, accessRole: 'admin', tenureGroup: 'Old' },
-        { empId: '212', name: 'Marwa Ahmed', email: 'marwa.ahmed@tempo.fit', emailAliases: ['marwa@tempo.fit'], dept: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 11, tenureGroup: 'Old' },
-        { empId: '808', name: 'Noha Radwan', email: 'noha.radwan@tempo.fit', emailAliases: ['noha@tempo.fit', 'radwan@tempo.fit'], dept: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-11-13', usedDays: 11, tenureGroup: 'Old' },
-        { empId: '705', name: 'Fatma Mohammed', email: 'fatma.mohammad@tempo.fit', emailAliases: ['fatma.mohammed@tempo.fit', 'fatma@tempo.fit'], dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2022-11-21', usedDays: 11, tenureGroup: 'Old' },
-        { empId: '876', name: 'Andrew Osama Khalil', email: 'andrew.khalil@tempo.fit', emailAliases: ['andrew@tempo.fit', 'khalil@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-06-08', usedDays: 1, tenureGroup: 'Old' },
-        { empId: '880', name: 'Ammar Ahmed', email: 'ammar.ahmed@tempo.fit', emailAliases: ['ammar@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-07-06', usedDays: 0, tenureGroup: 'Old' },
-        { empId: '878', name: 'Mostafa Ashraf', email: 'mostafa.abdelrahim@tempo.fit', emailAliases: ['mostafa.ashraf@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 0, tenureGroup: 'Old' },
-        { empId: '194', name: 'Heba El Sobky', email: 'hebasobky@tempo.fit', emailAliases: ['heba.elsobky@tempo.fit', 'sobky@tempo.fit', 'elsobky@tempo.fit', 'heba@tempo.fit'], dept: 'QA Lead', supervisor: 'Nancy Elsharony', joinDate: '2021-06-21', usedDays: 13, tenureGroup: 'Old' },
-        { empId: '755', name: 'Aida Clement', email: 'aida.clement@tempo.fit', emailAliases: ['aida@tempo.fit', 'clement@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2023-02-06', usedDays: 13, tenureGroup: 'Old' },
-        { empId: '889', name: 'Mohamed Faheem', email: 'mohamed.faheem@tempo.fit', emailAliases: ['faheem@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 1, tenureGroup: 'Old' },
-        { empId: '873', name: 'Salma Atef', email: 'salma.atef@tempo.fit', emailAliases: ['atef@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 4, tenureGroup: 'Old' },
-        { empId: '787', name: 'Khaled Ahmed', email: 'khaled.ahmed@tempo.fit', dept: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2023-03-13', usedDays: 14, tenureGroup: 'Old' },
-        { empId: '401', name: 'Mohamed Halim', email: 'halim@tempo.fit', emailAliases: ['mohamed.halim@tempo.fit'], dept: 'Workforce Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-09-01', usedDays: 14, tenureGroup: 'Old' },
-        { empId: '850', name: 'Ashraf Essam', email: 'ashraf.essam@tempo.fit', emailAliases: ['ashraf@tempo.fit', 'essam@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-01-20', usedDays: 14, tenureGroup: 'Old' },
-        { empId: '869', name: 'Stephan Radu Onose', email: 'stephan.radu@tempo.fit', emailAliases: ['stephan.onose@tempo.fit', 'stephan@tempo.fit', 'onose@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 5, tenureGroup: 'Old' },
-        { empId: '865', name: 'Mostafa Mohamed Hosny', email: 'mostafa.hosny@tempo.fit', emailAliases: ['hosny@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 5, tenureGroup: 'Old' },
-        { empId: '851', name: 'Hala Ayman', email: 'hala.ayman@tempo.fit', emailAliases: ['hala@tempo.fit', 'ayman@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-07-14', usedDays: 12, tenureGroup: 'Old' },
-        { empId: '868', name: 'Abdelrahman Fathy', email: 'abdelrahman.fathy@tempo.fit', emailAliases: ['fathy@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 6, tenureGroup: 'Old' },
-        { empId: '816', name: 'Hagar Alaa', email: 'hagar.alaa@tempo.fit', emailAliases: ['hagar@tempo.fit', 'alaa@tempo.fit'], dept: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2024-04-29', usedDays: 16, tenureGroup: 'Old' },
-        { empId: '882', name: 'Ibrahem Mohamed Mosbah', email: 'ibrahe.mosbah@tempo.fit', emailAliases: ['ibrahem.mosbah@tempo.fit', 'ibrahem@tempo.fit', 'mosbah@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 4, tenureGroup: 'Old' },
-        { empId: '467', name: 'Emad Mohamed', email: 'emad.mohamed@tempo.fit', emailAliases: ['emad@tempo.fit'], dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2021-11-15', usedDays: 18, tenureGroup: 'Old' },
-        { empId: '523', name: 'Nada Ashraf', email: 'nada.ashraf@tempo.fit', emailAliases: ['nada@tempo.fit'], dept: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-07-25', usedDays: 18, tenureGroup: 'Old' },
-        { empId: '861', name: 'Shahd Emad', email: 'shahd.emad@tempo.fit', emailAliases: ['shahd@tempo.fit'], dept: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2025-08-11', usedDays: 20, tenureGroup: 'Old' },
-        { empId: '901', name: 'Mohra Khaled', email: 'mohra.khaled@tempo.fit', emailAliases: ['mohra@tempo.fit'], dept: 'Realtime Analyst', supervisor: 'Mohamed Halim', joinDate: '2026-09-14', usedDays: 0, tenureGroup: 'New' },
-        { empId: '902', name: 'Ruben Joseph', email: 'ruben.joseph@tempo.fit', emailAliases: ['ruben@tempo.fit', 'joseph@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '903', name: 'Yussif Zayed', email: 'yussif.zayed@tempo.fit', emailAliases: ['yussif@tempo.fit', 'zayed@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '906', name: 'Howida Mattar', email: 'howida.mattar@tempo.fit', emailAliases: ['howida@tempo.fit', 'mattar@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '907', name: 'Rowan Ashour', email: 'rowan.ashour@tempo.fit', emailAliases: ['rowan@tempo.fit', 'ashour@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '908', name: 'Amr El Torgman', email: 'amr.eltorgman@tempo.fit', emailAliases: ['amr@tempo.fit', 'torgman@tempo.fit', 'eltorgman@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '909', name: 'Khaled Ahmed Abbas', email: 'khaled.abbas@tempo.fit', dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '910', name: 'Abdelrahman Amr', email: 'abdelrahman.amr@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '912', name: 'Mohamed Shebl', email: 'mohamed.shebl@tempo.fit', emailAliases: ['shebl@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '913', name: 'Noureldin Mahmoud Hassan', email: 'noureldin.hassan@tempo.fit', emailAliases: ['noureldin@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '914', name: 'Ahmed Keshk', email: 'ahmed.keshk@tempo.fit', emailAliases: ['keshk@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '915', name: 'Ahmed Abbas', email: 'ahmed.abbas@tempo.fit', dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '917', name: 'Tarneem Elnaggar', email: 'tarneem.elnaggar@tempo.fit', emailAliases: ['tarneem@tempo.fit', 'elnaggar@tempo.fit'], dept: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        { empId: '922', name: 'Alaa Mousa', email: 'alaa.mousa@tempo.fit', emailAliases: ['mousa@tempo.fit'], dept: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0, tenureGroup: 'New' },
-        // Access-Only Accounts (No Annual Leave Balance)
-        { empId: '164', name: 'Nancy Elsharony', email: 'nancy@tempo.fit', emailAliases: ['nancy.elsharony@tempo.fit', 'elsharony@tempo.fit'], dept: 'Site Director', supervisor: '', joinDate: '2021-01-01', usedDays: 0, accessRole: 'admin', noLeaveBalance: true, tenureGroup: 'Old' },
-        { empId: '253', name: 'Salma Ramadan', email: 'salmaramadan@tempo.fit', emailAliases: ['salma.ramadan@tempo.fit', 'salma@tempo.fit', 'ramadan@tempo.fit'], dept: 'HR Manager', supervisor: '', joinDate: '2022-01-01', usedDays: 0, accessRole: 'admin', noLeaveBalance: true, tenureGroup: 'Old' },
-        { empId: '260', name: 'Menna Yasser', email: 'menna@tempo.fit', emailAliases: ['menna.yasser@tempo.fit', 'yasser@tempo.fit'], dept: 'HR', supervisor: 'Salma Ramadan', joinDate: '2023-01-01', usedDays: 0, accessRole: 'agent', noLeaveBalance: true, tenureGroup: 'Old' }
+        { empId: '164', name: 'Nancy Elsharony', email: 'nancy@tempo.fit', emailAliases: ['nancy.elsharony@tempo.fit'], lob: 'Site Director', supervisor: '', joinDate: '2020-01-01', role: 'admin', noLeaveBalance: true },
+        { empId: '253', name: 'Salma Ramadan', email: 'salmaramadan@tempo.fit', emailAliases: ['salma.ramadan@tempo.fit'], lob: 'HR Manager', supervisor: '', joinDate: '2020-01-01', role: 'admin', noLeaveBalance: true },
+        { empId: '522', name: 'Mostafa Adel', email: 'mostafa.adel@tempo.fit', emailAliases: ['adel@tempo.fit'], lob: 'Workforce Analyst', supervisor: 'Mohamed Halim', joinDate: '2022-07-25', usedDays: 10, role: 'admin' },
+        { empId: '401', name: 'Mohamed Halim', email: 'halim@tempo.fit', emailAliases: ['mohamed.halim@tempo.fit'], lob: 'Workforce Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-09-01', usedDays: 14, role: 'admin' },
+        { empId: '234', name: 'Khaled El Sabban', email: 'khaledsabban@tempo.fit', emailAliases: ['khaled.elsabban@tempo.fit', 'elsabban@tempo.fit'], lob: 'Operation Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-06-23', usedDays: 10, exceptional: true, role: 'admin' },
+        { empId: '180', name: 'Mohamed Mounir AbdMagid', email: 'mohamed.abdelmagid@tempo.fit', emailAliases: ['mohamed.mounir@tempo.fit', 'mounir@tempo.fit'], lob: 'Change Integration Manager', supervisor: 'Nancy Elsharony', joinDate: '2021-04-05', usedDays: 9, role: 'admin' },
+        { empId: '194', name: 'Heba El Sobky', email: 'hebasobky@tempo.fit', emailAliases: ['heba.elsobky@tempo.fit', 'sobky@tempo.fit'], lob: 'QA Lead', supervisor: 'Nancy Elsharony', joinDate: '2021-06-21', usedDays: 13 },
+        { empId: '218', name: 'Ahmed Elsawy', email: 'ahmed.elsawy@tempo.fit', emailAliases: ['sawy@tempo.fit'], lob: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7 },
+        { empId: '212', name: 'Marwa Ahmed', email: 'marwa.ahmed@tempo.fit', emailAliases: ['marwa@tempo.fit'], lob: 'Team Lead', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 11 },
+        { empId: '209', name: 'Ahmed Mahmoud', email: 'ahmed.mahmoud@tempo.fit', lob: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2021-06-21', usedDays: 7 },
+        { empId: '530', name: 'Job James', email: 'job.james@tempo.fit', lob: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 3 },
+        { empId: '224', name: 'Lina Hesham', email: 'linahesham@tempo.fit', emailAliases: ['lina.hesham@tempo.fit'], lob: 'Social', supervisor: 'Mohamed Mounir', joinDate: '2024-06-03', usedDays: 8 },
+        { empId: '531', name: 'Ariath Piol', email: 'ariath.piol@tempo.fit', lob: 'Social', supervisor: 'Lina Hesham', joinDate: '2022-07-25', usedDays: 8 },
+        { empId: '805', name: 'Rima Khaled Hassan Zaki', email: 'rima.khaled@tempo.fit', emailAliases: ['rima.zaki@tempo.fit'], lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2023-11-13', usedDays: 9 },
+        { empId: '832', name: 'Ahmed Abdelghany', email: 'ahmed.abdelghany@tempo.fit', lob: 'QA', supervisor: 'Heba El Sobky', joinDate: '2024-08-05', usedDays: 9 },
+        { empId: '476', name: 'Hassan Khallaf', email: 'hassan@tempo.fit', emailAliases: ['hassan.khallaf@tempo.fit'], lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-03-07', usedDays: 9 },
+        { empId: '174', name: 'Mohab Magdy', email: 'mohab.magdy@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2021-04-05', usedDays: 9 },
+        { empId: '792', name: 'Rashad Mohamed', email: 'rashad.mohamed@tempo.fit', emailAliases: ['rashad@tempo.fit'], lob: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-03-13', usedDays: 9 },
+        { empId: '808', name: 'Noha Radwan Abdulaziz', email: 'noha.radwan@tempo.fit', lob: 'T2 / Mentor', supervisor: 'Mohamed Mounir', joinDate: '2023-11-13', usedDays: 11 },
+        { empId: '705', name: 'Fatma Mohammed', email: 'fatma.mohammad@tempo.fit', emailAliases: ['fatma.mohammed@tempo.fit'], lob: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2022-11-21', usedDays: 11 },
+        { empId: '876', name: 'Andrew Osama Khalil', email: 'andrew.khalil@tempo.fit', lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-06-08', usedDays: 1 },
+        { empId: '880', name: 'Ammar Ahmed', email: 'ammar.ahmed@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-07-06', usedDays: 0 },
+        { empId: '878', name: 'Mostafa Ashraf', email: 'mostafa.abdelrahim@tempo.fit', emailAliases: ['mostafa.ashraf@tempo.fit'], lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 0 },
+        { empId: '755', name: 'Aida Clement', email: 'aida.clement@tempo.fit', lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2023-02-06', usedDays: 13 },
+        { empId: '889', name: 'Mohamed Faheem', email: 'mohamed.faheem@tempo.fit', lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 1 },
+        { empId: '873', name: 'Salma Atef', email: 'salma.atef@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 4 },
+        { empId: '787', name: 'Khaled Ahmed Mohamed Yousof', email: 'khaled.ahmed@tempo.fit', lob: 'T2/Tech', supervisor: 'Khaled El Sabban', joinDate: '2023-03-13', usedDays: 14 },
+        { empId: '850', name: 'Ashraf Essam', email: 'ashraf.essam@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-01-20', usedDays: 14 },
+        { empId: '869', name: 'Stephan Radu Onose', email: 'stephan.radu@tempo.fit', emailAliases: ['stephan.onose@tempo.fit'], lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 5 },
+        { empId: '865', name: 'Mostafa Mohamed Hosny', email: 'mostafa.hosny@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-05-04', usedDays: 5 },
+        { empId: '851', name: 'Hala Ayman', email: 'hala.ayman@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2025-07-14', usedDays: 12 },
+        { empId: '868', name: 'Abdelrahman Fathy', email: 'abdelrahman.fathy@tempo.fit', lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-05-04', usedDays: 6 },
+        { empId: '816', name: 'Hagar Alaa', email: 'hagar.alaa@tempo.fit', lob: 'QA Coach', supervisor: 'Heba El Sobky', joinDate: '2024-04-29', usedDays: 16 },
+        { empId: '882', name: 'Ibrahem Mohamed Mosbah', email: 'ibrahe.mosbah@tempo.fit', emailAliases: ['ibrahem.mosbah@tempo.fit'], lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2026-07-06', usedDays: 4 },
+        { empId: '467', name: 'Emad Mohamed', email: 'emad.mohamed@tempo.fit', lob: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2021-11-15', usedDays: 18 },
+        { empId: '523', name: 'Nada Ashraf', email: 'nada.ashraf@tempo.fit', lob: 'MX', supervisor: 'Marwa Ahmed', joinDate: '2022-07-25', usedDays: 18 },
+        { empId: '861', name: 'Shahd Emad', email: 'shahd.emad@tempo.fit', lob: 'T2/Mentor', supervisor: 'Mohamed Mounir', joinDate: '2025-08-11', usedDays: 20 },
+        { empId: '900', name: 'Menna Yasser', email: 'menna@tempo.fit', emailAliases: ['menna.yasser@tempo.fit'], lob: 'HR / Operations', supervisor: 'Salma Ramadan', joinDate: '2024-01-01', usedDays: 0 },
+        { empId: '901', name: 'Mohra Khaled', email: 'mohra.khaled@tempo.fit', lob: 'Realtime Analyst', supervisor: 'Mohamed Halim', joinDate: '2026-09-14', usedDays: 0 },
+        { empId: '902', name: 'Ruben Joseph', email: 'ruben.joseph@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '903', name: 'Yussif Zayed', email: 'yussif.zayed@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '906', name: 'Howida Mattar', email: 'howida.mattar@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '907', name: 'Rowan Ashour', email: 'rowan.ashour@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '908', name: 'Amr El Torgman', email: 'amr.eltorgman@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '909', name: 'Khaled Ahmed Abbas', email: 'khaled.abbas@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '910', name: 'Abdelrahman Amr', email: 'abdelrahman.amr@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '912', name: 'Mohamed Shebl', email: 'mohamed.shebl@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '913', name: 'Noureldin Mahmoud Hassan', email: 'noureldin.hassan@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '914', name: 'Ahmed Keshk', email: 'ahmed.keshk@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '915', name: 'Ahmed Abbas', email: 'ahmed.abbas@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '917', name: 'Tarneem Elnaggar', email: 'tarneem.elnaggar@tempo.fit', lob: 'MX', supervisor: 'Lina Hesham', joinDate: '2026-09-28', usedDays: 0 },
+        { empId: '922', name: 'Alaa Mousa', email: 'alaa.mousa@tempo.fit', lob: 'Wins', supervisor: 'Ahmed El Sawy', joinDate: '2026-09-28', usedDays: 0 }
       ];
 
       return raw.map((item, idx) => ({
-        id: idx + 1,
-        empId: item.empId,
+        id: `agent_${item.empId}_${idx}`,
+        empId: String(item.empId),
         name: item.name,
-        email: item.email,
-        emailAliases: item.emailAliases || [],
-        dept: item.dept,
+        email: (item.email || generateDefaultEmail(item.name)).toLowerCase(),
+        emailAliases: (item.emailAliases || []).map(e => e.toLowerCase()),
+        lob: item.lob || 'Operations',
         supervisor: item.supervisor || '',
         joinDate: item.joinDate,
         usedDays: Number(item.usedDays || 0),
         casualUsedDays: Number(item.casualUsedDays || 0),
-        usedDays2027: Number(item.usedDays2027 || 0),
-        casualUsedDays2027: Number(item.casualUsedDays2027 || 0),
-        monthlyUsed: item.monthlyUsed || {},
-        monthlyCasualUsed: item.monthlyCasualUsed || {},
-        isExceptional: Boolean(item.isExceptional),
-        accessRole: item.accessRole || 'agent',
-        noLeaveBalance: Boolean(item.noLeaveBalance),
-        customPassword: item.customPassword || '',
-        tenureGroup: item.tenureGroup || 'Old'
-      }));
-    }
-
-    function reconcileAndMigrateRoster(loadedList) {
-      const defaults = getDefaultAgents();
-      const defaultByEmpId = new Map(defaults.map(d => [String(d.empId), d]));
-      let changed = false;
-
-      // 1. Sync primary emails & emailAliases onto existing canonical records while preserving passwords & usage
-      loadedList.forEach(item => {
-        const def = defaultByEmpId.get(String(item.empId));
-        if (def) {
-          if (item.email !== def.email) {
-            item.email = def.email;
-            changed = true;
-          }
-          const mergedAliases = [...new Set([...(item.emailAliases || []), ...(def.emailAliases || [])])];
-          if (mergedAliases.length !== (item.emailAliases || []).length) {
-            item.emailAliases = mergedAliases;
-            changed = true;
-          }
-        }
-      });
-
-      // Ensure any new default users (like Menna Yasser #260) are present in saved storage
-      defaults.forEach(def => {
-        if (!loadedList.some(item => String(item.empId) === String(def.empId))) {
-          loadedList.push(def);
-          changed = true;
-        }
-      });
-
-      // 2. Auto-merge any previously auto-provisioned stub accounts (empId >= 923) into their real roster match
-      const stubs = loadedList.filter(a => Number(a.empId) >= 923 && a.joinDate === '2026-11-01' && a.tenureGroup === 'New');
-      if (stubs.length > 0) {
-        const nonStubs = loadedList.filter(a => !stubs.includes(a));
-        stubs.forEach(stub => {
-          const realTarget = matchUserInList(nonStubs, stub.email);
-          if (realTarget) {
-            if (stub.customPassword && !realTarget.customPassword) {
-              realTarget.customPassword = stub.customPassword;
-            }
-            const aliasEmail = String(stub.email || '').trim().toLowerCase();
-            if (aliasEmail && aliasEmail !== realTarget.email.toLowerCase()) {
-              realTarget.emailAliases = [...new Set([...(realTarget.emailAliases || []), aliasEmail])];
-            }
-            changed = true;
-          } else {
-            nonStubs.push(stub);
-          }
-        });
-        if (changed) {
-          saveAgents(nonStubs);
-          return nonStubs;
-        }
-      }
-
-      if (changed) {
-        saveAgents(loadedList);
-      }
-      return loadedList;
-    }
-
-    function loadAgents() {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return reconcileAndMigrateRoster(parsed);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load saved agents:', err);
-      }
-      const defaults = getDefaultAgents();
-      saveAgents(defaults);
-      return defaults;
-    }
-
-    function saveAgents(list = agents) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-      } catch (err) {
-        console.error('Failed to save agents:', err);
-      }
-    }
-
-    // =========================================================================
-    // 2. LEAVE ACCRUAL CALCULATION ENGINE (2026 & 2027 CYCLES)
-    // =========================================================================
-    function getCycleMilestones(year = 2026) {
-      const startYear = Number(year);
-      const months = [
-        { m: 1, y: startYear, label: `By 1-Feb-${String(startYear).slice(-2)}`, key: `${startYear}-02` },
-        { m: 2, y: startYear, label: `By 1-Mar-${String(startYear).slice(-2)}`, key: `${startYear}-03` },
-        { m: 3, y: startYear, label: `By 1-Apr-${String(startYear).slice(-2)}`, key: `${startYear}-04` },
-        { m: 4, y: startYear, label: `By 1-May-${String(startYear).slice(-2)}`, key: `${startYear}-05` },
-        { m: 5, y: startYear, label: `By 1-Jun-${String(startYear).slice(-2)}`, key: `${startYear}-06` },
-        { m: 6, y: startYear, label: `By 1-Jul-${String(startYear).slice(-2)}`, key: `${startYear}-07` },
-        { m: 7, y: startYear, label: `By 1-Aug-${String(startYear).slice(-2)}`, key: `${startYear}-08` },
-        { m: 8, y: startYear, label: `By 1-Sep-${String(startYear).slice(-2)}`, key: `${startYear}-09` },
-        { m: 9, y: startYear, label: `By 1-Oct-${String(startYear).slice(-2)}`, key: `${startYear}-10` },
-        { m: 10, y: startYear, label: `By 1-Nov-${String(startYear).slice(-2)}`, key: `${startYear}-11` },
-        { m: 11, y: startYear, label: `By 1-Dec-${String(startYear).slice(-2)}`, key: `${startYear}-12` },
-        { m: 0, y: startYear + 1, label: `By 1-Jan-${String(startYear + 1).slice(-2)}`, key: `${startYear + 1}-01` }
-      ];
-      return months.map(item => ({
-        ...item,
-        date: new Date(item.y, item.m, 1)
-      }));
-    }
-
-    function calculateAgentLeave(agent, refDate = getReferenceDate()) {
-      const joinDate = parseLocalDate(agent.joinDate);
-      const firstPayoutDate = getFirstPayoutDate(joinDate);
-      const probationDate = addMonthsClamped(joinDate, 3);
-      const anniversaryDate = addMonthsClamped(joinDate, 12);
-
-      const is2027View = refDate >= new Date(2027, 1, 1);
-      const cycleYear = is2027View ? 2027 : 2026;
-      const milestones = getCycleMilestones(cycleYear);
-
-      let accruedToDate = 0;
-      let fullCycleDeserved = 0;
-      let payoutsCount = 0;
-      const ledger = [];
-
-      milestones.forEach(ms => {
-        const eligibleForPayout = ms.date >= firstPayoutDate;
-        const isSenior = ms.date >= anniversaryDate;
-        let rate = 0;
-        let tierLabel = 'Not Yet Eligible';
-
-        if (eligibleForPayout) {
-          if (agent.isExceptional) {
-            rate = 2.5;
-            tierLabel = 'Exceptional (2.50/mo)';
-          } else if (isSenior) {
-            rate = 1.75;
-            tierLabel = 'Senior ≥1 Yr (1.75/mo)';
-          } else {
-            rate = 1.25;
-            tierLabel = 'Standard <1 Yr (1.25/mo)';
-          }
-        }
-
-        fullCycleDeserved += rate;
-        const isReached = ms.date <= refDate;
-        if (isReached && rate > 0) {
-          accruedToDate += rate;
-          payoutsCount += 1;
-        }
-
-        const mAnnual = Number((agent.monthlyUsed && agent.monthlyUsed[ms.key]) || 0);
-        const mCasual = Number((agent.monthlyCasualUsed && agent.monthlyCasualUsed[ms.key]) || 0);
-
-        ledger.push({
-          ...ms,
-          rate,
-          tierLabel,
-          isReached,
-          annualTaken: mAnnual,
-          casualTaken: mCasual,
-          cumulativeAccrued: Number(accruedToDate.toFixed(2))
-        });
-      });
-
-      const currentIsSenior = refDate >= anniversaryDate;
-      const currentRate = agent.isExceptional ? 2.5 : (currentIsSenior ? 1.75 : 1.25);
-      const isPostProbation = refDate >= probationDate;
-
-      const annualTaken = is2027View
-        ? Number(agent.usedDays2027 || 0)
-        : Number(agent.usedDays || 0);
-      const casualTaken = is2027View
-        ? Number(agent.casualUsedDays2027 || 0)
-        : Number(agent.casualUsedDays || 0);
-
-      const totalDeducted = Number((annualTaken + casualTaken).toFixed(2));
-      const remainingBalance = Number((accruedToDate - totalDeducted).toFixed(2));
-
-      const monthsTenure = Math.max(
-        0,
-        (refDate.getFullYear() - joinDate.getFullYear()) * 12 +
-          (refDate.getMonth() - joinDate.getMonth())
-      );
-
-      return {
-        joinDate,
-        firstPayoutDate,
-        probationDate,
-        anniversaryDate,
-        is2027View,
-        cycleYear,
-        currentRate,
-        isPostProbation,
-        monthsTenure,
-        accruedToDate: Number(accruedToDate.toFixed(2)),
-        fullCycleDeserved: Number(fullCycleDeserved.toFixed(2)),
-        payoutsCount,
-        annualTaken,
-        casualTaken,
-        totalDeducted,
-        remainingBalance,
-        ledger
-      };
-    }
-
-    // =========================================================================
-    // 3. UNIFIED EMAIL SIGN-IN, 1ST-TIME PASSWORD SETUP & SESSION ROUTING
-    // =========================================================================
-    function isTempoEmail(email) {
-      const clean = String(email || '').trim().toLowerCase();
-      return /^[a-z0-9._%+-]+@tempo\.fit$/.test(clean);
-    }
-
-    function createAutoProvisionedTempoUser(email) {
-      const clean = String(email || '').trim().toLowerCase();
-      const localPart = clean.split('@')[0] || 'team.member';
-      const displayName = localPart
-        .split(/[._-]+/)
-        .filter(Boolean)
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ') || 'Team Member';
-
-      const nextId = agents.reduce((m, a) => Math.max(m, Number(a.id) || 0), 0) + 1;
-      const maxEmp = agents.reduce((m, a) => Math.max(m, Number(a.empId) || 922), 922);
-
-      const newUser = {
-        id: nextId,
-        empId: String(maxEmp + 1),
-        name: displayName,
-        email: clean,
-        emailAliases: [],
-        dept: 'MX',
-        supervisor: 'Lina Hesham',
-        joinDate: '2026-11-01',
-        usedDays: 0,
-        casualUsedDays: 0,
         usedDays2027: 0,
         casualUsedDays2027: 0,
         monthlyUsed: {},
         monthlyCasualUsed: {},
-        isExceptional: false,
-        accessRole: 'agent',
-        noLeaveBalance: false,
-        customPassword: '',
-        tenureGroup: 'New'
-      };
-
-      agents.push(newUser);
-      saveAgents();
-      return newUser;
+        exceptional: Boolean(item.exceptional),
+        role: item.role || 'agent',
+        noLeaveBalance: Boolean(item.noLeaveBalance),
+        customPassword: null
+      }));
     }
 
-    function matchUserInList(list, email) {
-      const clean = String(email || '').trim().toLowerCase();
-      if (!clean) return null;
-
-      // 1. Exact primary email match
-      const exact = list.find(a => String(a.email || '').trim().toLowerCase() === clean);
-      if (exact) return exact;
-
-      // 2. Explicit emailAliases match (e.g., halim@tempo.fit -> Mohamed Halim #401)
-      const aliasMatch = list.find(a =>
-        Array.isArray(a.emailAliases) &&
-        a.emailAliases.some(al => String(al || '').trim().toLowerCase() === clean)
-      );
-      if (aliasMatch) return aliasMatch;
-
-      // 3. Smart single-token surname/unique-name match for @tempo.fit emails
-      if (isTempoEmail(clean)) {
-        const localPart = clean.split('@')[0].replace(/[^a-z0-9]/g, '');
-        if (localPart.length >= 3) {
-          const tokenMatches = list.filter(a => {
-            const nameTokens = String(a.name || '')
-              .toLowerCase()
-              .split(/\s+/)
-              .map(t => t.replace(/[^a-z0-9]/g, ''))
-              .filter(Boolean);
-            const joinedFull = nameTokens.join('');
-            return nameTokens.includes(localPart) || joinedFull === localPart;
-          });
-          if (tokenMatches.length === 1) {
-            return tokenMatches[0];
-          }
+    function loadAgents() {
+      const defaults = getDefaultAgents();
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+          return defaults;
         }
+        const saved = JSON.parse(raw);
+        if (!Array.isArray(saved) || saved.length === 0) return defaults;
+
+        // Reconcile saved passwords, roles, and custom edits with canonical defaults
+        const byEmpId = new Map(saved.map(s => [String(s.empId), s]));
+        const merged = defaults.map(def => {
+          const existing = byEmpId.get(String(def.empId));
+          if (!existing) return def;
+          return {
+            ...def,
+            email: def.email,
+            emailAliases: def.emailAliases,
+            usedDays: existing.usedDays !== undefined ? Number(existing.usedDays) : def.usedDays,
+            casualUsedDays: existing.casualUsedDays !== undefined ? Number(existing.casualUsedDays) : def.casualUsedDays,
+            usedDays2027: Number(existing.usedDays2027 || 0),
+            casualUsedDays2027: Number(existing.casualUsedDays2027 || 0),
+            monthlyUsed: existing.monthlyUsed || {},
+            monthlyCasualUsed: existing.monthlyCasualUsed || {},
+            role: existing.role || def.role,
+            customPassword: existing.customPassword || null
+          };
+        });
+
+        // Keep any extra user-added agents not in canonical defaults
+        const defaultIds = new Set(defaults.map(d => String(d.empId)));
+        saved.forEach(s => {
+          if (!defaultIds.has(String(s.empId)) && Number(s.empId) !== 923) {
+            merged.push(s);
+          }
+        });
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        return merged;
+      } catch (e) {
+        return defaults;
+      }
+    }
+
+    function saveAgentsToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(agents));
+      } catch (e) {}
+    }
+
+    // =========================================================================
+    // 3. CORE ACCRUAL & BALANCE CALCULATION ENGINE
+    // =========================================================================
+    function getAgentAnnualUsage(agent, is2027) {
+      if (is2027) {
+        const jan27 = Number(agent.monthlyUsed?.['2027-01'] || 0);
+        return Number(agent.usedDays2027 || 0) + jan27;
+      }
+      return Number(agent.usedDays || 0);
+    }
+
+    function getAgentCasualUsage(agent, is2027) {
+      if (is2027) {
+        const jan27 = Number(agent.monthlyCasualUsed?.['2027-01'] || 0);
+        return Number(agent.casualUsedDays2027 || 0) + jan27;
+      }
+      return Number(agent.casualUsedDays || 0);
+    }
+
+    function calculateAgentLeave(agent, refDate = getReferenceDate()) {
+      const joinDate = parseLocalDate(agent.joinDate);
+      const anniversaryDate = addMonthsClamped(joinDate, 12);
+      const probationEndDate = addMonthsClamped(joinDate, 3);
+      const firstPayoutDate = getFirstPayoutDate(joinDate);
+      const is2027 = refDate.getFullYear() >= 2027 && !(refDate.getFullYear() === 2027 && refDate.getMonth() === 0 && activePreset !== 'cycle_2027');
+
+      const isProbationPassed = refDate >= probationEndDate;
+      const isSenior = refDate >= anniversaryDate;
+
+      let currentRate = 1.25;
+      let tierLabel = 'Standard (< 1 Yr)';
+      let tierShort = '1.25 / mo';
+      if (agent.exceptional) {
+        currentRate = 2.50;
+        tierLabel = 'Exceptional Tier';
+        tierShort = '2.50 / mo';
+      } else if (isSenior) {
+        currentRate = 1.75;
+        tierLabel = 'Senior (>= 1 Yr)';
+        tierShort = '1.75 / mo';
       }
 
-      return null;
+      // Build 12 monthly payout milestones for active cycle
+      const cycleStartYear = is2027 ? 2027 : 2026;
+      const schedule = [];
+      let payoutsCount = 0;
+      let accruedToDate = 0;
+      let fullCycleEntitlement = 0;
+
+      for (let i = 0; i < 12; i++) {
+        const mDate = new Date(cycleStartYear, 1 + i, 1); // Feb 1 .. Jan 1 next year
+        const key = `${mDate.getFullYear()}-${String(mDate.getMonth() + 1).padStart(2, '0')}`;
+        const label = `By ${formatDisplayDate(mDate)}`;
+
+        let rateForMonth = 1.25;
+        let monthTier = '1.25 / mo';
+        if (agent.exceptional) {
+          rateForMonth = 2.50;
+          monthTier = '2.50 / mo (Exceptional)';
+        } else if (mDate >= anniversaryDate) {
+          rateForMonth = 1.75;
+          monthTier = '1.75 / mo (>= 1 Yr)';
+        } else {
+          monthTier = '1.25 / mo (< 1 Yr)';
+        }
+
+        const earned = mDate >= firstPayoutDate ? rateForMonth : 0;
+        fullCycleEntitlement += earned;
+
+        if (mDate <= refDate && earned > 0) {
+          accruedToDate += earned;
+          payoutsCount++;
+        }
+
+        schedule.push({
+          key,
+          date: mDate,
+          label,
+          tier: monthTier,
+          earned,
+          passed: mDate <= refDate,
+          used: Number(agent.monthlyUsed?.[key] || 0),
+          casualUsed: Number(agent.monthlyCasualUsed?.[key] || 0)
+        });
+      }
+
+      const annualTaken = getAgentAnnualUsage(agent, is2027);
+      const casualTaken = getAgentCasualUsage(agent, is2027);
+      const totalDeducted = annualTaken + casualTaken;
+      const availableBalance = accruedToDate - totalDeducted;
+
+      const monthsEmployed = Math.max(
+        0,
+        (refDate.getFullYear() - joinDate.getFullYear()) * 12 + (refDate.getMonth() - joinDate.getMonth())
+      );
+
+      return {
+        joinDate,
+        anniversaryDate,
+        probationEndDate,
+        firstPayoutDate,
+        is2027,
+        isProbationPassed,
+        isSenior,
+        currentRate,
+        tierLabel,
+        tierShort,
+        monthsEmployed,
+        payoutsCount,
+        accruedToDate,
+        fullCycleEntitlement,
+        annualTaken,
+        casualTaken,
+        totalDeducted,
+        availableBalance,
+        schedule
+      };
     }
 
-    function findUserByEmail(email) {
-      return matchUserInList(agents, email);
+    // =========================================================================
+    // 4. AUTHENTICATION, 1ST-TIME PASSWORD SETUP & SESSION MANAGEMENT
+    // =========================================================================
+    function findUserByEmail(rawEmail) {
+      const clean = String(rawEmail || '').trim().toLowerCase();
+      if (!clean) return null;
+      return agents.find(a =>
+        (a.email && a.email.toLowerCase() === clean) ||
+        (Array.isArray(a.emailAliases) && a.emailAliases.some(al => al.toLowerCase() === clean))
+      ) || null;
     }
 
     function isFirstTimeUser(user) {
-      if (!user) return false;
-      const pwd = String(user.customPassword || '').trim();
-      return !pwd || pwd === 'Tempo@123';
+      return !user || !user.customPassword || user.customPassword === DEFAULT_USER_PASS;
     }
 
     function checkAgentFirstTimeEmailStatus() {
-      const emailInput = document.getElementById('login-username-input');
+      const input = document.getElementById('login-username-input');
       const pwdGroup = document.getElementById('login-password-group');
       const banner = document.getElementById('first-time-detected-banner');
       const submitText = document.getElementById('login-submit-text');
       const errorBox = document.getElementById('login-error-msg');
+      if (!input) return;
+
+      const email = input.value.trim().toLowerCase();
       if (errorBox) errorBox.classList.add('hidden');
 
-      const rawEmail = emailInput ? emailInput.value.trim() : '';
-      const user = findUserByEmail(rawEmail);
-      const canFirstTimeSetup = (user && isFirstTimeUser(user)) || (!user && isTempoEmail(rawEmail));
+      if (!email || !email.includes('@')) {
+        if (pwdGroup) pwdGroup.classList.remove('hidden');
+        if (banner) banner.classList.add('hidden');
+        if (submitText) submitText.textContent = 'Continue with Email';
+        return;
+      }
 
-      if (canFirstTimeSetup) {
+      const matched = findUserByEmail(email);
+      const isTempoDomain = email.endsWith('@tempo.fit');
+
+      if ((matched && isFirstTimeUser(matched)) || (!matched && isTempoDomain)) {
         if (pwdGroup) pwdGroup.classList.add('hidden');
         if (banner) banner.classList.remove('hidden');
         if (submitText) submitText.textContent = 'Continue to Create Password';
@@ -1697,16 +1600,52 @@
     }
 
     function toggleLoginPasswordVisibility() {
-      const input = document.getElementById('login-password-input');
-      const icon = document.getElementById('login-pwd-eye-icon');
-      if (!input || !icon) return;
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.className = 'fa-regular fa-eye-slash text-xs';
-      } else {
-        input.type = 'password';
-        icon.className = 'fa-regular fa-eye text-xs';
+      const pwdInput = document.getElementById('login-password-input');
+      const eyeIcon = document.getElementById('login-pwd-eye-icon');
+      if (!pwdInput) return;
+      const isHidden = pwdInput.type === 'password';
+      pwdInput.type = isHidden ? 'text' : 'password';
+      if (eyeIcon) {
+        eyeIcon.className = isHidden ? 'fa-regular fa-eye-slash text-xs' : 'fa-regular fa-eye text-xs';
       }
+    }
+
+    function createAutoProvisionedTempoUser(email) {
+      const localPart = email.split('@')[0] || 'agent';
+      const displayName = localPart
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ') || 'Tempo Colleague';
+
+      const maxNum = agents.reduce((acc, a) => {
+        const n = parseInt(a.empId, 10);
+        return !isNaN(n) && n > acc ? n : acc;
+      }, 925);
+
+      const newUser = {
+        id: `agent_${Date.now()}`,
+        empId: String(maxNum + 1),
+        name: displayName,
+        email: email.toLowerCase(),
+        emailAliases: [],
+        lob: 'Operations',
+        supervisor: '',
+        joinDate: '2026-11-01',
+        usedDays: 0,
+        casualUsedDays: 0,
+        usedDays2027: 0,
+        casualUsedDays2027: 0,
+        monthlyUsed: {},
+        monthlyCasualUsed: {},
+        exceptional: false,
+        role: 'agent',
+        noLeaveBalance: false,
+        customPassword: null
+      };
+      agents.push(newUser);
+      saveAgentsToStorage();
+      return newUser;
     }
 
     function handleUnifiedLogin(event) {
@@ -1716,60 +1655,40 @@
       const errorBox = document.getElementById('login-error-msg');
       const errorText = document.getElementById('login-error-text');
 
-      if (!agents || agents.length === 0) {
-        agents = loadAgents();
-      }
-
-      const rawEmail = emailInput ? emailInput.value.trim().toLowerCase() : '';
-      if (!rawEmail) {
-        if (errorText) errorText.textContent = 'Please enter your @tempo.fit work email address.';
-        if (errorBox) errorBox.classList.remove('hidden');
-        if (emailInput) emailInput.focus();
-        return;
-      }
-
-      if (!isTempoEmail(rawEmail)) {
+      const email = (emailInput?.value || '').trim().toLowerCase();
+      if (!email || !email.includes('@')) {
         if (errorText) errorText.textContent = 'Please enter a valid @tempo.fit work email address.';
         if (errorBox) errorBox.classList.remove('hidden');
-        if (emailInput) emailInput.focus();
         return;
       }
 
-      let user = findUserByEmail(rawEmail);
+      let user = findUserByEmail(email);
+      if (!user && email.endsWith('@tempo.fit')) {
+        user = createAutoProvisionedTempoUser(email);
+      }
+
       if (!user) {
-        user = createAutoProvisionedTempoUser(rawEmail);
+        if (errorText) errorText.textContent = 'Email not recognized. Please use your @tempo.fit email address.';
+        if (errorBox) errorBox.classList.remove('hidden');
+        return;
       }
 
       if (isFirstTimeUser(user)) {
-        if (errorBox) errorBox.classList.add('hidden');
         pendingSetupUserId = user.id;
-        const setupNameEl = document.getElementById('setup-agent-name');
-        const setupEmailEl = document.getElementById('setup-agent-email');
-        const newPwdEl = document.getElementById('setup-new-password');
-        const confirmPwdEl = document.getElementById('setup-confirm-password');
-        const setupErrEl = document.getElementById('setup-pwd-error');
-        const stepSignin = document.getElementById('login-step-signin');
-        const stepCreate = document.getElementById('login-step-create-pwd');
+        document.getElementById('setup-agent-name').textContent = `${user.name} (#${user.empId})`;
+        document.getElementById('setup-agent-email').textContent = user.email;
+        document.getElementById('setup-new-password').value = '';
+        document.getElementById('setup-confirm-password').value = '';
+        document.getElementById('setup-pwd-error').classList.add('hidden');
 
-        if (setupNameEl) setupNameEl.textContent = `${user.name} (#${user.empId})`;
-        if (setupEmailEl) setupEmailEl.textContent = user.email;
-        if (newPwdEl) newPwdEl.value = '';
-        if (confirmPwdEl) confirmPwdEl.value = '';
-        if (setupErrEl) setupErrEl.classList.add('hidden');
-        if (stepSignin) stepSignin.classList.add('hidden');
-        if (stepCreate) stepCreate.classList.remove('hidden');
-        if (newPwdEl) setTimeout(() => newPwdEl.focus(), 50);
+        document.getElementById('login-step-signin').classList.add('hidden');
+        document.getElementById('login-step-create-pwd').classList.remove('hidden');
+        setTimeout(() => document.getElementById('setup-new-password')?.focus(), 50);
         return;
       }
 
-      const enteredPwd = pwdInput ? pwdInput.value : '';
-      if (!enteredPwd) {
-        if (errorText) errorText.textContent = 'Please enter your password.';
-        if (errorBox) errorBox.classList.remove('hidden');
-        if (pwdInput) pwdInput.focus();
-        return;
-      }
-      if (enteredPwd !== user.customPassword) {
+      const enteredPwd = pwdInput?.value || '';
+      if (!enteredPwd || enteredPwd !== user.customPassword) {
         if (errorText) errorText.textContent = 'Incorrect password. Please try again.';
         if (errorBox) errorBox.classList.remove('hidden');
         return;
@@ -1780,16 +1699,16 @@
 
     function handleFirstTimePasswordSetup(event) {
       if (event) event.preventDefault();
-      const p1 = (document.getElementById('setup-new-password')?.value || '').trim();
-      const p2 = (document.getElementById('setup-confirm-password')?.value || '').trim();
+      const newPwd = document.getElementById('setup-new-password').value;
+      const confirmPwd = document.getElementById('setup-confirm-password').value;
       const errEl = document.getElementById('setup-pwd-error');
 
-      if (p1.length < 6) {
+      if (!newPwd || newPwd.length < 6) {
         errEl.textContent = 'Password must be at least 6 characters long.';
         errEl.classList.remove('hidden');
         return;
       }
-      if (p1 !== p2) {
+      if (newPwd !== confirmPwd) {
         errEl.textContent = 'Passwords do not match. Please re-enter.';
         errEl.classList.remove('hidden');
         return;
@@ -1797,14 +1716,14 @@
 
       const user = agents.find(a => a.id === pendingSetupUserId);
       if (!user) {
-        errEl.textContent = 'Session expired. Please go back and enter your email again.';
-        errEl.classList.remove('hidden');
+        cancelFirstTimePasswordSetup();
         return;
       }
-      user.customPassword = p1;
-      saveAgents();
+
+      user.customPassword = newPwd;
+      saveAgentsToStorage();
       pendingSetupUserId = null;
-      showToast('Personal password saved!');
+      showToast('Password created! Welcome to Tempo Annual Leave Tracker.');
       completeSignInSession(user);
     }
 
@@ -1816,47 +1735,45 @@
 
     function completeSignInSession(user) {
       currentSessionUser = user;
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+          empId: user.empId,
+          email: user.email
+        }));
+      } catch (e) {}
+
       document.getElementById('login-gate-view').classList.add('hidden');
       document.getElementById('sign-out-btn').classList.remove('hidden');
 
       const badgeText = document.getElementById('role-mode-text');
       const headerSub = document.getElementById('header-subtitle');
 
-      if (user.accessRole === 'admin') {
-        document.getElementById('admin-dashboard-view').classList.remove('hidden');
-        document.getElementById('employee-portal-view').classList.add('hidden');
-        document.getElementById('admin-header-controls').classList.remove('hidden');
-        document.getElementById('schedules-header-btn').classList.remove('hidden');
-
-        if (badgeText) badgeText.textContent = 'Admin Workspace';
+      if (user.role === 'admin') {
+        if (badgeText) badgeText.textContent = 'Admin Access';
         if (headerSub) headerSub.textContent = `Signed in as ${user.name} (${user.email})`;
+        document.getElementById('admin-header-controls').classList.remove('hidden');
+        document.getElementById('schedules-header-btn')?.classList.remove('hidden');
+        document.getElementById('employee-portal-view').classList.add('hidden');
+        document.getElementById('admin-dashboard-view').classList.remove('hidden');
 
         const adminLabel = document.getElementById('logged-in-admin-label');
         if (adminLabel) {
-          adminLabel.innerHTML = `Signed in as <strong class="text-slate-700 dark:text-neutral-200">${escapeHtml(user.name)}</strong><br><span class="font-mono text-[10px]">${escapeHtml(user.email)}</span>`;
+          adminLabel.innerHTML = `<strong class="text-slate-800 dark:text-neutral-200 block">${escapeHtml(user.name)}</strong><span>${escapeHtml(user.email)}</span>`;
         }
 
         const myBalBtn = document.getElementById('admin-tab-mybalance-btn');
         if (myBalBtn) {
-          if (user.noLeaveBalance) {
-            myBalBtn.classList.add('hidden');
-          } else {
-            myBalBtn.classList.remove('hidden');
-          }
+          myBalBtn.classList.toggle('hidden', Boolean(user.noLeaveBalance));
         }
 
-        populateDynamicFilters();
         switchAdminWorkspaceTab('roster');
         renderDashboard();
       } else {
+        if (badgeText) badgeText.textContent = 'Agent Self-Service';
+        if (headerSub) headerSub.textContent = `Signed in as ${user.name} (${user.email})`;
+        document.getElementById('admin-header-controls').classList.add('hidden');
         document.getElementById('admin-dashboard-view').classList.add('hidden');
         document.getElementById('employee-portal-view').classList.remove('hidden');
-        document.getElementById('admin-header-controls').classList.add('hidden');
-        document.getElementById('schedules-header-btn').classList.add('hidden');
-
-        if (badgeText) badgeText.textContent = 'Agent Self-Service';
-        if (headerSub) headerSub.textContent = `${user.name} • ${user.email}`;
-
         renderEmployeePortal(user);
       }
     }
@@ -1864,33 +1781,35 @@
     function signOutSession() {
       currentSessionUser = null;
       pendingSetupUserId = null;
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch (e) {}
 
       // Return employee portal section to its original parent if embedded in admin tab
-      const empView = document.getElementById('employee-portal-view');
-      const mainBody = document.body;
-      if (empView && empView.parentElement && empView.parentElement.id === 'admin-subtab-mybalance') {
-        mainBody.insertBefore(empView, document.getElementById('agent-pwd-modal'));
+      const empPortal = document.getElementById('employee-portal-view');
+      const bodyEl = document.body;
+      if (empPortal && empPortal.parentElement !== bodyEl) {
+        bodyEl.insertBefore(empPortal, document.getElementById('agent-pwd-modal'));
       }
 
       document.getElementById('admin-dashboard-view').classList.add('hidden');
       document.getElementById('employee-portal-view').classList.add('hidden');
       document.getElementById('admin-header-controls').classList.add('hidden');
-      document.getElementById('schedules-header-btn').classList.add('hidden');
       document.getElementById('sign-out-btn').classList.add('hidden');
       document.getElementById('login-gate-view').classList.remove('hidden');
       document.getElementById('login-step-create-pwd').classList.add('hidden');
       document.getElementById('login-step-signin').classList.remove('hidden');
       document.getElementById('login-password-input').value = '';
-      checkAgentFirstTimeEmailStatus();
 
       const badgeText = document.getElementById('role-mode-text');
       const headerSub = document.getElementById('header-subtitle');
       if (badgeText) badgeText.textContent = 'Sign In Required';
       if (headerSub) headerSub.textContent = 'Email-Authenticated Leave Balance Portal';
+      checkAgentFirstTimeEmailStatus();
     }
 
     // =========================================================================
-    // 4. ADMIN WORKSPACE NAVIGATION, ROSTER RENDERING & PRESETS
+    // 5. ADMIN WORKSPACE TABS, FILTERS, ROSTER & ANALYTICS RENDERING
     // =========================================================================
     function switchAdminWorkspaceTab(tabName) {
       const tabs = {
@@ -1900,127 +1819,114 @@
         my_balance: { btn: 'admin-tab-mybalance-btn', panel: 'admin-subtab-mybalance' }
       };
 
-      Object.entries(tabs).forEach(([key, ids]) => {
-        const btn = document.getElementById(ids.btn);
-        const panel = document.getElementById(ids.panel);
-        if (!btn || !panel) return;
-        if (key === tabName) {
-          btn.className = 'w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-blue-900 text-white shadow-xs transition shrink-0 md:shrink';
-          panel.classList.remove('hidden');
-        } else {
-          btn.className = 'w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-neutral-800 hover:text-slate-900 dark:hover:text-white transition shrink-0 md:shrink';
-          panel.classList.add('hidden');
-        }
+      const activeClass = 'w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-blue-900 text-white shadow-xs transition shrink-0 md:shrink';
+      const inactiveClass = 'w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-neutral-800 hover:text-slate-900 dark:hover:text-white transition shrink-0 md:shrink';
+
+      Object.entries(tabs).forEach(([key, cfg]) => {
+        const btn = document.getElementById(cfg.btn);
+        const panel = document.getElementById(cfg.panel);
+        if (btn) btn.className = key === tabName ? activeClass : inactiveClass;
+        if (panel) panel.classList.toggle('hidden', key !== tabName);
       });
 
-      if (tabName === 'users') {
-        renderManageUsersTable();
-      } else if (tabName === 'analytics') {
-        renderAnalyticsPage();
-      } else if (tabName === 'my_balance' && currentSessionUser && !currentSessionUser.noLeaveBalance) {
-        const container = document.getElementById('admin-subtab-mybalance');
-        const empView = document.getElementById('employee-portal-view');
-        if (container && empView) {
-          container.appendChild(empView);
-          empView.classList.remove('hidden', 'max-w-4xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8', 'py-6');
-          renderEmployeePortal(currentSessionUser);
-        }
-      } else {
-        renderDashboard();
+      const empPortal = document.getElementById('employee-portal-view');
+      const myBalHost = document.getElementById('admin-subtab-mybalance');
+
+      if (tabName === 'my_balance' && currentSessionUser && empPortal && myBalHost) {
+        myBalHost.appendChild(empPortal);
+        empPortal.classList.remove('hidden', 'max-w-4xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8', 'py-6');
+        renderEmployeePortal(currentSessionUser);
+      } else if (empPortal && empPortal.parentElement === myBalHost) {
+        empPortal.classList.add('hidden', 'max-w-4xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8', 'py-6');
+        document.body.insertBefore(empPortal, document.getElementById('agent-pwd-modal'));
       }
+
+      if (tabName === 'roster') renderDashboard();
+      if (tabName === 'users') renderManageUsersTable();
+      if (tabName === 'analytics') renderAnalyticsPage();
     }
 
     function populateDynamicFilters() {
-      const leaveRoster = agents.filter(a => !a.noLeaveBalance);
-      const lobs = [...new Set(leaveRoster.map(a => a.dept).filter(Boolean))].sort();
-      const supervisors = [...new Set(leaveRoster.map(a => a.supervisor).filter(Boolean))].sort();
+      const rosterAgents = agents.filter(a => !a.noLeaveBalance);
+      const lobs = [...new Set(rosterAgents.map(a => a.lob).filter(Boolean))].sort();
+      const supervisors = [...new Set(rosterAgents.map(a => a.supervisor).filter(Boolean))].sort();
 
-      const lobSel = document.getElementById('lob-filter');
-      const anaLobSel = document.getElementById('analytics-lob-filter');
-      const supSel = document.getElementById('supervisor-filter');
+      const lobSelect = document.getElementById('lob-filter');
+      const anaLobSelect = document.getElementById('analytics-lob-filter');
+      const supSelect = document.getElementById('supervisor-filter');
 
-      if (lobSel) {
-        const prev = lobSel.value;
-        lobSel.innerHTML = '<option value="all">All LOBs</option>' + lobs.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
-        if (lobs.includes(prev)) lobSel.value = prev;
-      }
-      if (anaLobSel) {
-        const prev = anaLobSel.value;
-        anaLobSel.innerHTML = '<option value="all">All LOBs</option>' + lobs.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
-        if (lobs.includes(prev)) anaLobSel.value = prev;
-      }
-      if (supSel) {
-        const prev = supSel.value;
-        supSel.innerHTML = '<option value="all">All Supervisors</option>' + supervisors.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-        if (supervisors.includes(prev)) supSel.value = prev;
+      if (lobSelect) {
+        const prev = lobSelect.value;
+        lobSelect.innerHTML = '<option value="all">All LOBs</option>' +
+          lobs.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+        if (lobs.includes(prev)) lobSelect.value = prev;
       }
 
-      const adminCount = agents.filter(a => a.accessRole === 'admin').length;
-      const pill = document.getElementById('admin-count-pill');
-      if (pill) pill.textContent = `${adminCount} Admin${adminCount === 1 ? '' : 's'}`;
+      if (anaLobSelect) {
+        const prev = anaLobSelect.value;
+        anaLobSelect.innerHTML = '<option value="all">All LOBs</option>' +
+          lobs.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+        if (lobs.includes(prev)) anaLobSelect.value = prev;
+      }
+
+      if (supSelect) {
+        const prev = supSelect.value;
+        supSelect.innerHTML = '<option value="all">All Supervisors</option>' +
+          supervisors.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+        if (supervisors.includes(prev)) supSelect.value = prev;
+      }
     }
 
     function setDatePreset(preset) {
-      activeDatePreset = preset;
+      activePreset = preset;
       const wrap2027 = document.getElementById('cycle-2027-milestone-wrap');
       if (wrap2027) {
-        if (preset === 'cycle_2027') wrap2027.classList.remove('hidden');
-        else wrap2027.classList.add('hidden');
+        wrap2027.classList.toggle('hidden', preset !== 'cycle_2027');
       }
       updatePresetButtonStyles();
       renderDashboard();
     }
 
     function setEmployeeDatePreset(preset) {
-      activeDatePreset = preset;
+      activePreset = preset;
       const wrap2027 = document.getElementById('emp-2027-milestone-wrap');
       if (wrap2027) {
-        if (preset === 'cycle_2027') wrap2027.classList.remove('hidden');
-        else wrap2027.classList.add('hidden');
+        wrap2027.classList.toggle('hidden', preset !== 'cycle_2027');
       }
       updatePresetButtonStyles();
       if (currentSessionUser) renderEmployeePortal(currentSessionUser);
     }
 
-    function setCycle2027Month(monthIdx) {
-      cycle2027MonthIndex = Number(monthIdx) || 0;
+    function setCycle2027Month(offset) {
+      cycle2027MonthOffset = Number(offset || 0);
       const adminSel = document.getElementById('cycle-2027-milestone-select');
       const empSel = document.getElementById('emp-2027-milestone-select');
-      if (adminSel) adminSel.value = String(cycle2027MonthIndex);
-      if (empSel) empSel.value = String(cycle2027MonthIndex);
-      if (currentSessionUser && currentSessionUser.accessRole === 'admin') {
+      if (adminSel) adminSel.value = String(cycle2027MonthOffset);
+      if (empSel) empSel.value = String(cycle2027MonthOffset);
+
+      if (currentSessionUser && currentSessionUser.role === 'admin') {
         renderDashboard();
-        if (!document.getElementById('admin-subtab-mybalance').classList.contains('hidden')) {
-          renderEmployeePortal(currentSessionUser);
-        }
-      } else if (currentSessionUser) {
+      }
+      if (currentSessionUser && !document.getElementById('employee-portal-view').classList.contains('hidden')) {
         renderEmployeePortal(currentSessionUser);
       }
     }
 
     function updatePresetButtonStyles() {
-      const adminMap = {
-        today: 'preset-today-btn',
-        next_month: 'preset-next-month-btn',
-        full_2026: 'preset-2026-btn',
-        cycle_2027: 'preset-2027-btn'
-      };
-      const empMap = {
-        today: 'emp-preset-today-btn',
-        next_month: 'emp-preset-next-month-btn',
-        full_2026: 'emp-preset-2026-btn',
-        cycle_2027: 'emp-preset-2027-btn'
+      const activeCls = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition';
+      const inactiveCls = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
+
+      const map = {
+        today: ['preset-today-btn', 'emp-preset-today-btn'],
+        next_month: ['preset-next-month-btn', 'emp-preset-next-month-btn'],
+        full_2026: ['preset-2026-btn', 'emp-preset-2026-btn'],
+        cycle_2027: ['preset-2027-btn', 'emp-preset-2027-btn']
       };
 
-      [adminMap, empMap].forEach(map => {
-        Object.entries(map).forEach(([key, btnId]) => {
-          const btn = document.getElementById(btnId);
-          if (!btn) return;
-          if (key === activeDatePreset) {
-            btn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition';
-          } else {
-            btn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
-          }
+      Object.entries(map).forEach(([key, ids]) => {
+        ids.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.className = key === activePreset ? activeCls : inactiveCls;
         });
       });
     }
@@ -2033,77 +1939,91 @@
       const supFilter = document.getElementById('supervisor-filter')?.value || 'all';
 
       const rosterAgents = agents.filter(a => !a.noLeaveBalance);
-      const calculated = rosterAgents.map(agent => ({
+      const enriched = rosterAgents.map(agent => ({
         agent,
         calc: calculateAgentLeave(agent, refDate)
       }));
 
-      const filtered = calculated.filter(({ agent, calc }) => {
+      // Aggregate KPI stats across roster
+      let totalAccrued = 0;
+      let totalFullCycle = 0;
+      let totalAnnual = 0;
+      let totalCasual = 0;
+      let totalAvailable = 0;
+      let eligibleCount = 0;
+      let probationCount = 0;
+
+      enriched.forEach(({ calc }) => {
+        totalAccrued += calc.accruedToDate;
+        totalFullCycle += calc.fullCycleEntitlement;
+        totalAnnual += calc.annualTaken;
+        totalCasual += calc.casualTaken;
+        totalAvailable += calc.availableBalance;
+        if (calc.isProbationPassed) eligibleCount++;
+        else probationCount++;
+      });
+
+      const is2027 = activePreset === 'cycle_2027';
+      document.getElementById('stat-total-agents').textContent = String(rosterAgents.length);
+      document.getElementById('stat-eligible-sub').textContent = `${eligibleCount} eligible • ${probationCount} in probation`;
+      document.getElementById('stat-total-accrued').textContent = formatNum(totalAccrued);
+      document.getElementById('stat-accrued-sub').textContent = `${is2027 ? '2027' : '2026'} Balance: ${formatNum(totalFullCycle)}`;
+      document.getElementById('stat-total-annual').textContent = formatNum(totalAnnual);
+      document.getElementById('stat-total-casual').textContent = formatNum(totalCasual);
+      document.getElementById('stat-total-available').textContent = formatNum(totalAvailable);
+
+      const adminCount = agents.filter(a => a.role === 'admin').length;
+      const adminPill = document.getElementById('admin-count-pill');
+      if (adminPill) adminPill.textContent = `${adminCount} Admin${adminCount === 1 ? '' : 's'}`;
+
+      // Filter rows
+      const filtered = enriched.filter(({ agent, calc }) => {
         if (search) {
-          const hay = `${agent.empId} ${agent.name} ${agent.email} ${agent.dept} ${agent.supervisor}`.toLowerCase();
+          const hay = `${agent.empId} ${agent.name} ${agent.email} ${agent.lob} ${agent.supervisor}`.toLowerCase();
           if (!hay.includes(search)) return false;
         }
-        if (lobFilter !== 'all' && agent.dept !== lobFilter) return false;
+        if (lobFilter !== 'all' && agent.lob !== lobFilter) return false;
         if (supFilter !== 'all' && agent.supervisor !== supFilter) return false;
 
-        if (statusFilter === 'new_hire' && agent.tenureGroup !== 'New') return false;
-        if (statusFilter === 'old_staff' && agent.tenureGroup !== 'Old') return false;
-        if (statusFilter === 'eligible' && !calc.isPostProbation) return false;
-        if (statusFilter === 'probation' && calc.isPostProbation) return false;
-        if (statusFilter === 'tier1' && (agent.isExceptional || calc.currentRate !== 1.25)) return false;
-        if (statusFilter === 'tier2' && (agent.isExceptional || calc.currentRate !== 1.75)) return false;
-        if (statusFilter === 'exceptional' && !agent.isExceptional) return false;
-        if (statusFilter === 'negative' && calc.remainingBalance >= 0) return false;
+        if (statusFilter === 'new_hire' && calc.joinDate.getFullYear() < 2026) return false;
+        if (statusFilter === 'old_staff' && calc.joinDate.getFullYear() >= 2026) return false;
+        if (statusFilter === 'eligible' && !calc.isProbationPassed) return false;
+        if (statusFilter === 'probation' && calc.isProbationPassed) return false;
+        if (statusFilter === 'tier1' && (agent.exceptional || calc.isSenior)) return false;
+        if (statusFilter === 'tier2' && (agent.exceptional || !calc.isSenior)) return false;
+        if (statusFilter === 'exceptional' && !agent.exceptional) return false;
+        if (statusFilter === 'negative' && calc.availableBalance >= 0) return false;
         return true;
       });
 
-      const totalAgents = filtered.length;
-      const eligibleCount = filtered.filter(x => x.calc.isPostProbation).length;
-      const probationCount = totalAgents - eligibleCount;
-      const sumAccrued = filtered.reduce((s, x) => s + x.calc.accruedToDate, 0);
-      const sumFullCycle = filtered.reduce((s, x) => s + x.calc.fullCycleDeserved, 0);
-      const sumAnnual = filtered.reduce((s, x) => s + x.calc.annualTaken, 0);
-      const sumCasual = filtered.reduce((s, x) => s + x.calc.casualTaken, 0);
-      const sumRemaining = filtered.reduce((s, x) => s + x.calc.remainingBalance, 0);
-
-      document.getElementById('stat-total-agents').textContent = String(totalAgents);
-      document.getElementById('stat-eligible-sub').textContent = `${eligibleCount} eligible • ${probationCount} in probation`;
-      document.getElementById('stat-total-accrued').textContent = formatNum(sumAccrued);
-      document.getElementById('stat-accrued-sub').textContent = `${activeDatePreset === 'cycle_2027' ? '2027' : '2026'} Full Balance: ${formatNum(sumFullCycle)}`;
-      document.getElementById('stat-total-annual').textContent = formatNum(sumAnnual);
-      document.getElementById('stat-total-casual').textContent = formatNum(sumCasual);
-      document.getElementById('stat-total-available').textContent = formatNum(sumRemaining);
-
-      const badge = document.getElementById('roster-count-badge');
-      if (badge) badge.textContent = `${filtered.length} of ${rosterAgents.length}`;
+      const countBadge = document.getElementById('roster-count-badge');
+      if (countBadge) countBadge.textContent = `${filtered.length} of ${rosterAgents.length}`;
 
       const tbody = document.getElementById('agents-tbody');
       if (!tbody) return;
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="py-10 text-center text-sm text-slate-500 dark:text-neutral-400">No matching agents found for the active filter.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="py-10 text-center text-sm text-slate-500 dark:text-neutral-400">No matching team members found.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = filtered.map(({ agent, calc }) => {
-        const rateBadge = agent.isExceptional
+        const rateBadge = agent.exceptional
           ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">2.50 / mo</span>`
-          : calc.currentRate === 1.75
+          : calc.isSenior
             ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">1.75 / mo</span>`
             : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">1.25 / mo</span>`;
 
-        const eligBadge = calc.isPostProbation
+        const eligBadge = calc.isProbationPassed
           ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"><i class="fa-solid fa-circle-check text-[10px]"></i>Eligible</span>`
           : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300"><i class="fa-solid fa-hourglass-half text-[10px]"></i>Probation</span>`;
 
-        const remColor = calc.remainingBalance < 0
+        const remColor = calc.availableBalance < 0
           ? 'text-rose-600 dark:text-rose-400 font-bold'
           : 'text-emerald-600 dark:text-emerald-400 font-bold';
 
-        const cycleLabel = calc.is2027View ? '2027 Balance' : '2026 Balance';
-
         return `
-          <tr class="hover:bg-slate-50/80 dark:hover:bg-neutral-800/40 transition tabular-nums">
+          <tr class="hover:bg-slate-50/90 dark:hover:bg-neutral-800/50 transition tabular-nums">
             <td class="py-3 px-4">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">#${escapeHtml(agent.empId)}</span>
@@ -2112,44 +2032,47 @@
               <div class="text-[11px] font-mono text-slate-500 dark:text-neutral-400 mt-0.5">${escapeHtml(agent.email)}</div>
             </td>
             <td class="py-3 px-3">
-              <div class="text-xs font-semibold text-slate-800 dark:text-neutral-200">${escapeHtml(agent.dept)}</div>
-              <div class="text-[11px] text-slate-500 dark:text-neutral-400">${escapeHtml(agent.supervisor || '—')}</div>
+              <div class="font-medium text-slate-800 dark:text-neutral-200">${escapeHtml(agent.lob)}</div>
+              <div class="text-xs text-slate-500 dark:text-neutral-400">${agent.supervisor ? escapeHtml(agent.supervisor) : '—'}</div>
             </td>
             <td class="py-3 px-3">
-              <div class="text-xs font-medium text-slate-800 dark:text-neutral-200">${formatDisplayDate(calc.joinDate)}</div>
-              <div class="text-[11px] text-slate-500 dark:text-neutral-400">${calc.monthsTenure} mos tenure</div>
+              <div class="font-medium text-slate-800 dark:text-neutral-200">${formatDisplayDate(calc.joinDate)}</div>
+              <div class="text-xs text-slate-500 dark:text-neutral-400">${calc.monthsEmployed} mos tenure</div>
             </td>
             <td class="py-3 px-3">${rateBadge}</td>
             <td class="py-3 px-3">${eligBadge}</td>
             <td class="py-3 px-3 text-right">
-              <div class="text-sm font-bold text-blue-600 dark:text-blue-400">${formatNum(calc.accruedToDate)}</div>
-              <div class="text-[11px] text-slate-500 dark:text-neutral-400">${cycleLabel}: ${formatNum(calc.fullCycleDeserved)}</div>
+              <div class="text-base font-bold text-blue-600 dark:text-blue-400">${formatNum(calc.accruedToDate)}</div>
+              <div class="text-[11px] text-slate-500 dark:text-neutral-400">${is2027 ? '2027' : '2026'} Bal: ${formatNum(calc.fullCycleEntitlement)}</div>
             </td>
             <td class="py-3 px-3 text-center">
-              <div class="inline-flex items-center gap-1 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 rounded-lg px-1.5 py-0.5">
-                <button type="button" onclick="adjustAgentLeave(${agent.id}, 'annual', -0.5)" class="w-5 h-5 rounded text-amber-700 dark:text-amber-300 hover:bg-amber-200/60 dark:hover:bg-amber-900/60 font-bold text-xs">-</button>
-                <span class="min-w-[2rem] text-center text-xs font-bold text-amber-700 dark:text-amber-300">${formatNum(calc.annualTaken)}</span>
-                <button type="button" onclick="adjustAgentLeave(${agent.id}, 'annual', 0.5)" class="w-5 h-5 rounded text-amber-700 dark:text-amber-300 hover:bg-amber-200/60 dark:hover:bg-amber-900/60 font-bold text-xs">+</button>
+              <div class="inline-flex items-center gap-1 bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 rounded-lg px-1.5 py-0.5">
+                <button type="button" onclick="adjustAgentLeave('${agent.id}', 'annual', -1)" class="w-5 h-5 rounded hover:bg-amber-200/70 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 text-xs font-bold">-</button>
+                <span class="min-w-[1.75rem] text-center font-bold text-amber-700 dark:text-amber-300">${formatNum(calc.annualTaken)}</span>
+                <button type="button" onclick="adjustAgentLeave('${agent.id}', 'annual', 1)" class="w-5 h-5 rounded hover:bg-amber-200/70 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 text-xs font-bold">+</button>
               </div>
             </td>
             <td class="py-3 px-3 text-center">
-              <div class="inline-flex items-center gap-1 bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 rounded-lg px-1.5 py-0.5">
-                <button type="button" onclick="adjustAgentLeave(${agent.id}, 'casual', -0.5)" class="w-5 h-5 rounded text-rose-700 dark:text-rose-300 hover:bg-rose-200/60 dark:hover:bg-rose-900/60 font-bold text-xs">-</button>
-                <span class="min-w-[2rem] text-center text-xs font-bold text-rose-700 dark:text-rose-300">${formatNum(calc.casualTaken)}</span>
-                <button type="button" onclick="adjustAgentLeave(${agent.id}, 'casual', 0.5)" class="w-5 h-5 rounded text-rose-700 dark:text-rose-300 hover:bg-rose-200/60 dark:hover:bg-rose-900/60 font-bold text-xs">+</button>
+              <div class="inline-flex items-center gap-1 bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 rounded-lg px-1.5 py-0.5">
+                <button type="button" onclick="adjustAgentLeave('${agent.id}', 'casual', -1)" class="w-5 h-5 rounded hover:bg-rose-200/70 dark:hover:bg-rose-900 text-rose-800 dark:text-rose-300 text-xs font-bold">-</button>
+                <span class="min-w-[1.75rem] text-center font-bold text-rose-700 dark:text-rose-300">${formatNum(calc.casualTaken)}</span>
+                <button type="button" onclick="adjustAgentLeave('${agent.id}', 'casual', 1)" class="w-5 h-5 rounded hover:bg-rose-200/70 dark:hover:bg-rose-900 text-rose-800 dark:text-rose-300 text-xs font-bold">+</button>
               </div>
             </td>
             <td class="py-3 px-3 text-right font-semibold text-slate-700 dark:text-neutral-300">${formatNum(calc.totalDeducted)}</td>
-            <td class="py-3 px-3 text-right text-sm ${remColor}">${formatNum(calc.remainingBalance)}</td>
+            <td class="py-3 px-3 text-right text-base ${remColor}">${formatNum(calc.availableBalance)}</td>
             <td class="py-3 px-4 text-right">
               <div class="inline-flex items-center gap-1">
-                <button type="button" onclick="openBreakdownModal(${agent.id})" title="View Milestone Ledger" class="w-7 h-7 rounded-lg text-slate-500 hover:text-blue-700 dark:text-neutral-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition">
-                  <i class="fa-solid fa-list-ol text-xs"></i>
+                <button type="button" onclick="openBreakdownModal('${agent.id}')" title="View Milestone Ledger"
+                  class="w-8 h-8 rounded-lg text-slate-500 hover:text-blue-700 dark:text-neutral-400 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition">
+                  <i class="fa-solid fa-table-list text-xs"></i>
                 </button>
-                <button type="button" onclick="openAgentModal(${agent.id})" title="Edit Agent" class="w-7 h-7 rounded-lg text-slate-500 hover:text-blue-700 dark:text-neutral-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition">
+                <button type="button" onclick="openAgentModal('${agent.id}')" title="Edit Agent"
+                  class="w-8 h-8 rounded-lg text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition">
                   <i class="fa-solid fa-pen-to-square text-xs"></i>
                 </button>
-                <button type="button" onclick="confirmDeleteAgent(${agent.id})" title="Remove Agent" class="w-7 h-7 rounded-lg text-slate-500 hover:text-rose-600 dark:text-neutral-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition">
+                <button type="button" onclick="confirmDeleteAgent('${agent.id}')" title="Delete Agent"
+                  class="w-8 h-8 rounded-lg text-slate-500 hover:text-rose-600 dark:text-neutral-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition">
                   <i class="fa-solid fa-trash-can text-xs"></i>
                 </button>
               </div>
@@ -2162,331 +2085,155 @@
     function adjustAgentLeave(agentId, type, delta) {
       const agent = agents.find(a => a.id === agentId);
       if (!agent) return;
-      const is2027 = activeDatePreset === 'cycle_2027';
+      const is2027 = activePreset === 'cycle_2027';
+
       if (type === 'annual') {
         if (is2027) {
-          agent.usedDays2027 = Math.max(0, Number(((agent.usedDays2027 || 0) + delta).toFixed(2)));
+          agent.usedDays2027 = Math.max(0, Number(agent.usedDays2027 || 0) + delta);
         } else {
-          agent.usedDays = Math.max(0, Number(((agent.usedDays || 0) + delta).toFixed(2)));
+          agent.usedDays = Math.max(0, Number(agent.usedDays || 0) + delta);
         }
       } else {
         if (is2027) {
-          agent.casualUsedDays2027 = Math.max(0, Number(((agent.casualUsedDays2027 || 0) + delta).toFixed(2)));
+          agent.casualUsedDays2027 = Math.max(0, Number(agent.casualUsedDays2027 || 0) + delta);
         } else {
-          agent.casualUsedDays = Math.max(0, Number(((agent.casualUsedDays || 0) + delta).toFixed(2)));
+          agent.casualUsedDays = Math.max(0, Number(agent.casualUsedDays || 0) + delta);
         }
       }
-      saveAgents();
+
+      saveAgentsToStorage();
       renderDashboard();
     }
 
     // =========================================================================
-    // 5. EMPLOYEE SELF-SERVICE PORTAL RENDERER
+    // 6. MONTH-OVER-MONTH ANALYTICS PAGE
     // =========================================================================
-    function setText(id, val) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = val;
-    }
-
-    function renderEmployeePortal(user) {
-      if (!user) return;
-      const refDate = getReferenceDate();
-      const calc = calculateAgentLeave(user, refDate);
-
-      const initials = user.name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-      setText('emp-avatar-initials', initials);
-      setText('emp-card-id', `#${user.empId}`);
-      setText('emp-card-name', user.name);
-      setText('emp-card-meta', `${user.dept}${user.supervisor ? ` • Supervisor: ${user.supervisor}` : ''} • Hired ${formatDisplayDate(calc.joinDate)}`);
-
-      const eligEl = document.getElementById('emp-card-eligibility');
-      if (eligEl) {
-        eligEl.innerHTML = calc.isPostProbation
-          ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><i class="fa-solid fa-circle-check text-[10px]"></i>Eligible</span>`
-          : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In Probation</span>`;
-      }
-
-      setText('emp-top-name', `${user.name} (#${user.empId})`);
-      setText('emp-top-join-date', `${formatDisplayDate(calc.joinDate)} (${calc.monthsTenure} mos)`);
-      setText('emp-top-lob', user.dept || '—');
-      setText('emp-top-supervisor', user.supervisor || '—');
-      setText('emp-stat-rate', calc.currentRate.toFixed(2));
-      setText(
-        'emp-top-rate-tier',
-        user.isExceptional
-          ? 'Exceptional tier (30 days/yr)'
-          : calc.currentRate === 1.75
-            ? 'Senior ≥ 1 yr tier (21 days/yr)'
-            : 'Standard < 1 yr tier (15 days/yr)'
-      );
-
-      setText('emp-stat-remaining', formatNum(calc.remainingBalance));
-      setText('emp-stat-accrued', formatNum(calc.accruedToDate));
-      setText('emp-stat-payouts', `${calc.is2027View ? '2027 Balance' : '2026 Balance'}: ${formatNum(calc.fullCycleDeserved)} (${calc.payoutsCount} payouts)`);
-      setText('emp-stat-annual', formatNum(calc.annualTaken));
-      setText('emp-stat-casual', formatNum(calc.casualTaken));
-
-      setText('emp-date-first-payout', formatDisplayDate(calc.firstPayoutDate));
-      setText('emp-date-probation', formatDisplayDate(calc.probationDate));
-      setText('emp-date-anniversary', formatDisplayDate(calc.anniversaryDate));
-
-      const ledgerCard = document.getElementById('emp-ledger-card');
-      if (ledgerCard) {
-        if (activeDatePreset === 'cycle_2027') {
-          ledgerCard.classList.remove('hidden');
-          renderEmployee2027Ledger(user, calc);
-        } else {
-          ledgerCard.classList.add('hidden');
-        }
-      }
-    }
-
-    function renderEmployee2027Ledger(user, calc) {
-      const tbody = document.getElementById('emp-ledger-tbody');
-      const tfoot = document.getElementById('emp-ledger-tfoot');
-      if (!tbody || !tfoot) return;
-
-      const janAnnual = Number((user.monthlyUsed && user.monthlyUsed['2027-01']) || 0);
-      const janCasual = Number((user.monthlyCasualUsed && user.monthlyCasualUsed['2027-01']) || 0);
-      let runningNet = -(janAnnual + janCasual);
-      let totalAccrued = 0;
-      let totalAnnual = janAnnual;
-      let totalCasual = janCasual;
-
-      const janRowHtml = `
-        <tr class="bg-amber-50/40 dark:bg-amber-950/20">
-          <td class="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">By 1-Jan-27 <span class="text-[11px] font-normal text-slate-500">(Jan 2027 Deduct Only)</span></td>
-          <td class="py-2.5 px-3 text-xs text-slate-500 dark:text-neutral-400">Pre-Reset Deduction</td>
-          <td class="py-2.5 px-3 text-right text-slate-400">—</td>
-          <td class="py-2.5 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold">${janAnnual ? `-${formatNum(janAnnual)}` : '0'}</td>
-          <td class="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold">${janCasual ? `-${formatNum(janCasual)}` : '0'}</td>
-          <td class="py-2.5 px-4 text-right font-bold ${runningNet < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">${formatNum(runningNet)}</td>
-        </tr>
-      `;
-
-      const rowsHtml = calc.ledger.map(row => {
-        totalAccrued += row.rate;
-        totalAnnual += row.annualTaken;
-        totalCasual += row.casualTaken;
-        runningNet = Number((runningNet + row.rate - row.annualTaken - row.casualTaken).toFixed(2));
-        return `
-          <tr class="${row.isReached ? '' : 'opacity-60'}">
-            <td class="py-2.5 px-4 font-medium text-slate-900 dark:text-white">${row.label}</td>
-            <td class="py-2.5 px-3 text-xs text-slate-600 dark:text-neutral-300">${row.tierLabel}</td>
-            <td class="py-2.5 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">+${formatNum(row.rate)}</td>
-            <td class="py-2.5 px-3 text-right text-amber-600 dark:text-amber-400">${row.annualTaken ? `-${formatNum(row.annualTaken)}` : '0'}</td>
-            <td class="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400">${row.casualTaken ? `-${formatNum(row.casualTaken)}` : '0'}</td>
-            <td class="py-2.5 px-4 text-right font-bold ${runningNet < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">${formatNum(runningNet)}</td>
-          </tr>
-        `;
-      }).join('');
-
-      tbody.innerHTML = janRowHtml + rowsHtml;
-      tfoot.innerHTML = `
-        <tr class="bg-blue-50/80 dark:bg-blue-950/40 border-t-2 border-blue-200 dark:border-blue-800 font-bold text-slate-900 dark:text-white">
-          <td colspan="2" class="py-3 px-4">Total (2027 Cycle)</td>
-          <td class="py-3 px-3 text-right text-blue-700 dark:text-blue-300">+${formatNum(totalAccrued)}</td>
-          <td class="py-3 px-3 text-right text-amber-700 dark:text-amber-300">-${formatNum(totalAnnual)}</td>
-          <td class="py-3 px-3 text-right text-rose-700 dark:text-rose-300">-${formatNum(totalCasual)}</td>
-          <td class="py-3 px-4 text-right text-emerald-700 dark:text-emerald-300">${formatNum(runningNet)}</td>
-        </tr>
-      `;
-    }
-
-    // =========================================================================
-    // 6. MANAGE USERS, ANALYTICS & MODALS
-    // =========================================================================
-    function renderManageUsersTable() {
-      const tbody = document.getElementById('manage-users-tbody');
-      if (!tbody) return;
-      const search = (document.getElementById('manage-users-search')?.value || '').trim().toLowerCase();
-      const roleFilter = document.getElementById('manage-users-role-filter')?.value || 'all';
-
-      const filtered = agents.filter(u => {
-        if (search) {
-          const hay = `${u.empId} ${u.name} ${u.email} ${u.dept} ${u.supervisor}`.toLowerCase();
-          if (!hay.includes(search)) return false;
-        }
-        if (roleFilter === 'admin' && u.accessRole !== 'admin') return false;
-        if (roleFilter === 'agent' && u.accessRole !== 'agent') return false;
-        if (roleFilter === 'pending' && u.customPassword) return false;
-        if (roleFilter === 'active' && !u.customPassword) return false;
-        return true;
-      });
-
-      const badge = document.getElementById('manage-users-count-badge');
-      if (badge) badge.textContent = `${filtered.length} Users`;
-
-      tbody.innerHTML = filtered.map(u => `
-        <tr class="hover:bg-slate-50/80 dark:hover:bg-neutral-800/40 transition">
-          <td class="py-3 px-4">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">#${escapeHtml(u.empId)}</span>
-              <span class="font-semibold text-slate-900 dark:text-white">${escapeHtml(u.name)}</span>
-              ${u.noLeaveBalance ? `<span class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">Access Only</span>` : ''}
-            </div>
-          </td>
-          <td class="py-3 px-3 font-mono text-xs text-slate-600 dark:text-neutral-300">${escapeHtml(u.email)}</td>
-          <td class="py-3 px-3 text-xs text-slate-600 dark:text-neutral-300">${escapeHtml(u.dept)}${u.supervisor ? ` &bull; ${escapeHtml(u.supervisor)}` : ''}</td>
-          <td class="py-3 px-3">
-            ${u.customPassword
-              ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"><i class="fa-solid fa-lock text-[10px]"></i>Password Set</span>`
-              : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300"><i class="fa-solid fa-sparkles text-[10px]"></i>1st-Time Setup Pending</span>`
-            }
-          </td>
-          <td class="py-3 px-3">
-            <select onchange="updateUserAccessRole(${u.id}, this.value)"
-              class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-slate-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-700">
-              <option value="agent" ${u.accessRole === 'agent' ? 'selected' : ''}>Agent (Self-Service)</option>
-              <option value="admin" ${u.accessRole === 'admin' ? 'selected' : ''}>Admin (Full Access)</option>
-            </select>
-          </td>
-          <td class="py-3 px-4 text-right">
-            <button type="button" onclick="resetUserPasswordToFirstTime(${u.id})"
-              class="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-neutral-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-lg transition">
-              <i class="fa-solid fa-rotate-left mr-1"></i>Reset Password
-            </button>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    function updateUserAccessRole(userId, newRole) {
-      const user = agents.find(a => a.id === userId);
-      if (!user) return;
-      user.accessRole = newRole;
-      saveAgents();
-      populateDynamicFilters();
-      showToast(`Updated ${user.name} to ${newRole === 'admin' ? 'Admin' : 'Agent'}`);
-    }
-
-    function resetUserPasswordToFirstTime(userId) {
-      const user = agents.find(a => a.id === userId);
-      if (!user) return;
-      user.customPassword = '';
-      saveAgents();
-      renderManageUsersTable();
-      showToast(`Password cleared for ${user.name} (1st-time setup enabled)`);
-    }
-
     function setAnalyticsYear(year) {
-      analyticsYear = String(year);
-      const b26 = document.getElementById('analytics-year-2026-btn');
-      const b27 = document.getElementById('analytics-year-2027-btn');
-      if (b26 && b27) {
-        b26.className = analyticsYear === '2026'
-          ? 'px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition'
-          : 'px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
-        b27.className = analyticsYear === '2027'
-          ? 'px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition'
-          : 'px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
-      }
+      activeAnalyticsYear = year;
+      const btn26 = document.getElementById('analytics-year-2026-btn');
+      const btn27 = document.getElementById('analytics-year-2027-btn');
+      const activeCls = 'px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-900 text-white shadow-xs transition';
+      const inactiveCls = 'px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-white transition';
+      if (btn26) btn26.className = year === '2026' ? activeCls : inactiveCls;
+      if (btn27) btn27.className = year === '2027' ? activeCls : inactiveCls;
       renderAnalyticsPage();
     }
 
     function renderAnalyticsPage() {
-      const year = Number(analyticsYear || 2026);
       const lobFilter = document.getElementById('analytics-lob-filter')?.value || 'all';
-      const roster = agents.filter(a => !a.noLeaveBalance && (lobFilter === 'all' || a.dept === lobFilter));
-      const endOfYearDate = new Date(year + 1, 0, 1);
+      const is2027 = activeAnalyticsYear === '2027';
+      const refDate = is2027 ? new Date(2028, 0, 1) : new Date(2027, 0, 1);
 
-      const milestones = getCycleMilestones(year).map(ms => ({
-        ...ms,
+      const rosterAgents = agents.filter(a => !a.noLeaveBalance && (lobFilter === 'all' || a.lob === lobFilter));
+      const monthNames = ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'];
+      const buckets = monthNames.map((m, idx) => ({
+        label: `${m} '${String((idx === 11 ? Number(activeAnalyticsYear) + 1 : Number(activeAnalyticsYear))).slice(-2)}`,
         accrued: 0,
         annual: 0,
         casual: 0
       }));
 
-      let totalAnnualCycle = 0;
-      let totalCasualCycle = 0;
-      const lobMap = {};
+      let totalAccrued = 0;
+      let totalAnnual = 0;
+      let totalCasual = 0;
+      const lobTotals = {};
 
-      roster.forEach(agent => {
-        const calc = calculateAgentLeave(agent, endOfYearDate);
-        calc.ledger.forEach((row, idx) => {
-          milestones[idx].accrued += row.rate;
-          milestones[idx].annual += row.annualTaken;
-          milestones[idx].casual += row.casualTaken;
+      rosterAgents.forEach(agent => {
+        const calc = calculateAgentLeave(agent, refDate);
+        totalAccrued += calc.fullCycleEntitlement;
+        totalAnnual += calc.annualTaken;
+        totalCasual += calc.casualTaken;
+
+        if (!lobTotals[agent.lob]) lobTotals[agent.lob] = { accrued: 0, deducted: 0 };
+        lobTotals[agent.lob].accrued += calc.fullCycleEntitlement;
+        lobTotals[agent.lob].deducted += calc.totalDeducted;
+
+        calc.schedule.forEach((m, idx) => {
+          buckets[idx].accrued += m.earned;
+          buckets[idx].annual += m.used;
+          buckets[idx].casual += m.casualUsed;
         });
-        totalAnnualCycle += calc.annualTaken;
-        totalCasualCycle += calc.casualTaken;
 
-        const dept = agent.dept || 'Other';
-        if (!lobMap[dept]) lobMap[dept] = { accrued: 0, annual: 0, casual: 0 };
-        lobMap[dept].accrued += calc.fullCycleDeserved;
-        lobMap[dept].annual += calc.annualTaken;
-        lobMap[dept].casual += calc.casualTaken;
+        // Distribute lump-sum taken days into the active reference month if monthly keys weren't explicitly itemized
+        const itemizedAnnual = calc.schedule.reduce((s, m) => s + m.used, 0);
+        const itemizedCasual = calc.schedule.reduce((s, m) => s + m.casualUsed, 0);
+        const remAnnual = Math.max(0, calc.annualTaken - itemizedAnnual);
+        const remCasual = Math.max(0, calc.casualTaken - itemizedCasual);
+        const targetBucket = is2027 ? 0 : 9; // Nov '26 for 2026 cycle, Feb '27 for 2027 cycle
+        buckets[targetBucket].annual += remAnnual;
+        buckets[targetBucket].casual += remCasual;
       });
 
-      const totalAccrued = milestones.reduce((s, m) => s + m.accrued, 0);
-      const totalDeducted = totalAnnualCycle + totalCasualCycle;
+      const totalDeducted = totalAnnual + totalCasual;
       const netRemaining = totalAccrued - totalDeducted;
-      const utilPct = totalAccrued > 0 ? ((totalDeducted / totalAccrued) * 100).toFixed(1) : '0.0';
+      const utilPct = totalAccrued > 0 ? Math.round((totalDeducted / totalAccrued) * 100) : 0;
 
-      setText('ana-kpi-accrued', formatNum(totalAccrued));
-      setText('ana-kpi-annual', formatNum(totalAnnualCycle));
-      setText('ana-kpi-casual', formatNum(totalCasualCycle));
-      setText('ana-kpi-deducted', formatNum(totalDeducted));
-      setText('ana-kpi-util-rate', `${utilPct}% utilization`);
-      setText('ana-kpi-remaining', formatNum(netRemaining));
+      document.getElementById('ana-kpi-accrued').textContent = formatNum(totalAccrued);
+      document.getElementById('ana-kpi-annual').textContent = formatNum(totalAnnual);
+      document.getElementById('ana-kpi-casual').textContent = formatNum(totalCasual);
+      document.getElementById('ana-kpi-deducted').textContent = formatNum(totalDeducted);
+      document.getElementById('ana-kpi-util-rate').textContent = `${utilPct}% utilization`;
+      document.getElementById('ana-kpi-remaining').textContent = formatNum(netRemaining);
 
-      const maxVal = Math.max(1, ...milestones.map(m => Math.max(m.accrued, m.annual + m.casual)));
+      // Render Bar Chart
+      const maxVal = Math.max(10, ...buckets.map(b => Math.max(b.accrued, b.annual + b.casual)));
       const chartEl = document.getElementById('analytics-bar-chart');
       if (chartEl) {
-        chartEl.innerHTML = milestones.map(m => {
-          const accH = Math.round((m.accrued / maxVal) * 140);
-          const annH = Math.round((m.annual / maxVal) * 140);
-          const casH = Math.round((m.casual / maxVal) * 140);
+        chartEl.innerHTML = buckets.map(b => {
+          const accH = Math.max(4, Math.round((b.accrued / maxVal) * 145));
+          const annH = Math.round((b.annual / maxVal) * 145);
+          const casH = Math.round((b.casual / maxVal) * 145);
           return `
             <div class="flex flex-col items-center gap-1.5">
-              <div class="w-full flex items-end justify-center gap-1 h-[145px]">
-                <div style="height:${accH}px" title="Accrued: ${formatNum(m.accrued)}" class="w-2.5 bg-blue-600 rounded-t-xs transition-all"></div>
-                <div class="w-2.5 flex flex-col justify-end">
-                  <div style="height:${casH}px" title="Casual: ${formatNum(m.casual)}" class="w-full bg-rose-500 rounded-t-xs"></div>
-                  <div style="height:${annH}px" title="Annual: ${formatNum(m.annual)}" class="w-full bg-amber-500"></div>
+              <div class="w-full flex items-end justify-center gap-1 h-40">
+                <div style="height:${accH}px" title="Accrued: ${formatNum(b.accrued)}" class="w-2.5 sm:w-3 rounded-t bg-blue-600 transition-all"></div>
+                <div class="w-2.5 sm:w-3 flex flex-col justify-end rounded-t overflow-hidden">
+                  <div style="height:${casH}px" title="Casual: ${formatNum(b.casual)}" class="w-full bg-rose-500"></div>
+                  <div style="height:${annH}px" title="Annual: ${formatNum(b.annual)}" class="w-full bg-amber-500"></div>
                 </div>
               </div>
-              <span class="text-[10px] font-semibold text-slate-500 dark:text-neutral-400">${m.label.replace('By 1-', '')}</span>
+              <span class="text-[10px] font-semibold text-slate-500 dark:text-neutral-400">${b.label}</span>
             </div>
           `;
         }).join('');
       }
 
-      const tbody = document.getElementById('analytics-mom-tbody');
-      if (tbody) {
-        let cumRem = 0;
-        tbody.innerHTML = milestones.map(m => {
-          const ded = m.annual + m.casual;
-          const net = m.accrued - ded;
-          cumRem += net;
+      // Render MoM Table
+      let runningRem = 0;
+      const momTbody = document.getElementById('analytics-mom-tbody');
+      if (momTbody) {
+        momTbody.innerHTML = buckets.map(b => {
+          const ded = b.annual + b.casual;
+          const net = b.accrued - ded;
+          runningRem += net;
           return `
-            <tr>
-              <td class="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">${m.label}</td>
-              <td class="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400 font-semibold">+${formatNum(m.accrued)}</td>
-              <td class="py-2.5 px-3 text-right text-amber-600 dark:text-amber-400">${formatNum(m.annual)}</td>
-              <td class="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400">${formatNum(m.casual)}</td>
+            <tr class="hover:bg-slate-50/80 dark:hover:bg-neutral-800/50">
+              <td class="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">${b.label}</td>
+              <td class="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400 font-semibold">+${formatNum(b.accrued)}</td>
+              <td class="py-2.5 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold">${formatNum(b.annual)}</td>
+              <td class="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold">${formatNum(b.casual)}</td>
               <td class="py-2.5 px-3 text-right font-semibold text-slate-700 dark:text-neutral-300">${formatNum(ded)}</td>
-              <td class="py-2.5 px-3 text-right font-semibold ${net < 0 ? 'text-rose-600' : 'text-emerald-600'}">${net >= 0 ? '+' : ''}${formatNum(net)}</td>
-              <td class="py-2.5 px-4 text-right font-bold text-slate-900 dark:text-white">${formatNum(cumRem)}</td>
+              <td class="py-2.5 px-3 text-right font-semibold ${net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">${net >= 0 ? '+' : ''}${formatNum(net)}</td>
+              <td class="py-2.5 px-4 text-right font-bold text-slate-900 dark:text-white">${formatNum(runningRem)}</td>
             </tr>
           `;
         }).join('');
       }
 
-      const lobListEl = document.getElementById('analytics-lob-list');
-      if (lobListEl) {
-        const entries = Object.entries(lobMap).sort((a, b) => (b[1].annual + b[1].casual) - (a[1].annual + a[1].casual));
-        lobListEl.innerHTML = entries.map(([dept, stats]) => {
-          const used = stats.annual + stats.casual;
-          const pct = stats.accrued > 0 ? Math.min(100, Math.round((used / stats.accrued) * 100)) : 0;
+      // Render LOB Breakdown
+      const lobList = document.getElementById('analytics-lob-list');
+      if (lobList) {
+        const entries = Object.entries(lobTotals).sort((a, b) => b[1].deducted - a[1].deducted);
+        lobList.innerHTML = entries.map(([lob, stat]) => {
+          const pct = stat.accrued > 0 ? Math.min(100, Math.round((stat.deducted / stat.accrued) * 100)) : 0;
           return `
-            <div class="space-y-1.5">
+            <div class="space-y-1">
               <div class="flex items-center justify-between text-xs">
-                <span class="font-bold text-slate-800 dark:text-neutral-200">${escapeHtml(dept)}</span>
-                <span class="text-slate-500 dark:text-neutral-400">${formatNum(used)} / ${formatNum(stats.accrued)} days (${pct}%)</span>
+                <span class="font-semibold text-slate-800 dark:text-neutral-200">${escapeHtml(lob)}</span>
+                <span class="text-slate-500 dark:text-neutral-400">${formatNum(stat.deducted)} / ${formatNum(stat.accrued)} days (${pct}%)</span>
               </div>
-              <div class="w-full h-2 bg-slate-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-                <div style="width:${pct}%" class="h-full bg-blue-700 rounded-full"></div>
+              <div class="w-full h-2 rounded-full bg-slate-100 dark:bg-neutral-800 overflow-hidden">
+                <div style="width:${pct}%" class="h-full rounded-full bg-blue-700"></div>
               </div>
             </div>
           `;
@@ -2495,7 +2242,188 @@
     }
 
     // =========================================================================
-    // 7. MODALS, SCHEDULE VIEWER, GOOGLE SHEETS SYNC & EXPORTS
+    // 7. EMPLOYEE SELF-SERVICE PORTAL, MANAGE USERS & MODALS
+    // =========================================================================
+    function renderEmployeePortal(user) {
+      if (!user) return;
+      const refDate = getReferenceDate();
+      const calc = calculateAgentLeave(user, refDate);
+      const is2027 = activePreset === 'cycle_2027';
+
+      const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'AG';
+      const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+      setText('emp-avatar-initials', initials);
+      setText('emp-card-id', `#${user.empId}`);
+      setText('emp-card-name', user.name);
+      setText('emp-card-meta', `${user.lob}${user.supervisor ? ` • Supervisor: ${user.supervisor}` : ''} • Hired ${formatDisplayDate(calc.joinDate)}`);
+
+      const eligEl = document.getElementById('emp-card-eligibility');
+      if (eligEl) {
+        eligEl.innerHTML = calc.isProbationPassed
+          ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><i class="fa-solid fa-circle-check text-[10px]"></i>Eligible</span>`
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><i class="fa-solid fa-hourglass-half text-[10px]"></i>In Probation</span>`;
+      }
+
+      setText('emp-top-name', `${user.name} (#${user.empId})`);
+      setText('emp-top-join-date', `${formatDisplayDate(calc.joinDate)} (${calc.monthsEmployed} mos)`);
+      setText('emp-top-lob', user.lob || '—');
+      setText('emp-top-supervisor', user.supervisor || '—');
+      setText('emp-stat-rate', formatNum(calc.currentRate));
+      setText('emp-top-rate-tier', `${calc.tierLabel} (${formatNum(calc.currentRate * 12)} days/yr)`);
+
+      setText('emp-stat-remaining', formatNum(calc.availableBalance));
+      setText('emp-stat-accrued', formatNum(calc.accruedToDate));
+      setText('emp-stat-payouts', `${is2027 ? '2027' : '2026'} Balance: ${formatNum(calc.fullCycleEntitlement)} (${calc.payoutsCount} payouts)`);
+      setText('emp-stat-annual', formatNum(calc.annualTaken));
+      setText('emp-stat-casual', formatNum(calc.casualTaken));
+
+      setText('emp-date-first-payout', formatDisplayDate(calc.firstPayoutDate));
+      setText('emp-date-probation', formatDisplayDate(calc.probationEndDate));
+      setText('emp-date-anniversary', formatDisplayDate(calc.anniversaryDate));
+
+      const ledgerCard = document.getElementById('emp-ledger-card');
+      if (ledgerCard) {
+        ledgerCard.classList.toggle('hidden', !is2027);
+        if (is2027) {
+          const tbody = document.getElementById('emp-ledger-tbody');
+          const tfoot = document.getElementById('emp-ledger-tfoot');
+          const jan27Annual = Number(user.monthlyUsed?.['2027-01'] || 0);
+          const jan27Casual = Number(user.monthlyCasualUsed?.['2027-01'] || 0);
+
+          let runningNet = -(jan27Annual + jan27Casual);
+          let totalEarned = 0;
+          let totalAnn = jan27Annual;
+          let totalCas = jan27Casual;
+
+          const janRow = `
+            <tr class="bg-amber-50/40 dark:bg-amber-950/20">
+              <td class="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">By 01-Jan-27 (Jan 2027)</td>
+              <td class="py-2.5 px-3 text-xs text-slate-500 dark:text-neutral-400">Jan 2027 Deduction Only</td>
+              <td class="py-2.5 px-3 text-right text-slate-400">—</td>
+              <td class="py-2.5 px-3 text-right text-amber-600 dark:text-amber-400 font-semibold">${formatNum(jan27Annual)}</td>
+              <td class="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-semibold">${formatNum(jan27Casual)}</td>
+              <td class="py-2.5 px-4 text-right font-bold ${runningNet < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}">${formatNum(runningNet)}</td>
+            </tr>
+          `;
+
+          const rows = calc.schedule.map((m, idx) => {
+            const ann = m.used + (idx === 0 ? Number(user.usedDays2027 || 0) : 0);
+            const cas = m.casualUsed + (idx === 0 ? Number(user.casualUsedDays2027 || 0) : 0);
+            totalEarned += m.earned;
+            totalAnn += ann;
+            totalCas += cas;
+            runningNet += m.earned - (ann + cas);
+
+            return `
+              <tr class="${m.passed ? '' : 'opacity-65'}">
+                <td class="py-2.5 px-4 font-medium text-slate-900 dark:text-white">${m.label}</td>
+                <td class="py-2.5 px-3 text-xs text-slate-500 dark:text-neutral-400">${m.tier}</td>
+                <td class="py-2.5 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">+${formatNum(m.earned)}</td>
+                <td class="py-2.5 px-3 text-right font-semibold text-amber-600 dark:text-amber-400">${formatNum(ann)}</td>
+                <td class="py-2.5 px-3 text-right font-semibold text-rose-600 dark:text-rose-400">${formatNum(cas)}</td>
+                <td class="py-2.5 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">${formatNum(runningNet)}</td>
+              </tr>
+            `;
+          }).join('');
+
+          if (tbody) tbody.innerHTML = janRow + rows;
+          if (tfoot) {
+            tfoot.innerHTML = `
+              <tr class="bg-blue-50/70 dark:bg-blue-950/40 border-t-2 border-blue-200 dark:border-blue-800 font-bold text-slate-900 dark:text-white">
+                <td class="py-3 px-4" colspan="2">Total (2027 Cycle)</td>
+                <td class="py-3 px-3 text-right text-blue-700 dark:text-blue-300">+${formatNum(totalEarned)}</td>
+                <td class="py-3 px-3 text-right text-amber-700 dark:text-amber-300">${formatNum(totalAnn)}</td>
+                <td class="py-3 px-3 text-right text-rose-700 dark:text-rose-300">${formatNum(totalCas)}</td>
+                <td class="py-3 px-4 text-right text-emerald-700 dark:text-emerald-300">${formatNum(runningNet)}</td>
+              </tr>
+            `;
+          }
+        }
+      }
+    }
+
+    function renderManageUsersTable() {
+      const search = (document.getElementById('manage-users-search')?.value || '').trim().toLowerCase();
+      const roleFilter = document.getElementById('manage-users-role-filter')?.value || 'all';
+      const tbody = document.getElementById('manage-users-tbody');
+      const countBadge = document.getElementById('manage-users-count-badge');
+      if (!tbody) return;
+
+      const filtered = agents.filter(u => {
+        if (search) {
+          const hay = `${u.empId} ${u.name} ${u.email} ${u.lob} ${u.supervisor}`.toLowerCase();
+          if (!hay.includes(search)) return false;
+        }
+        const pending = isFirstTimeUser(u);
+        if (roleFilter === 'admin' && u.role !== 'admin') return false;
+        if (roleFilter === 'agent' && u.role !== 'agent') return false;
+        if (roleFilter === 'pending' && !pending) return false;
+        if (roleFilter === 'active' && pending) return false;
+        return true;
+      });
+
+      if (countBadge) countBadge.textContent = `${filtered.length} Users`;
+
+      tbody.innerHTML = filtered.map(u => {
+        const pending = isFirstTimeUser(u);
+        const statusBadge = pending
+          ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">1st-Time Setup Pending</span>`
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">Password Active</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50/80 dark:hover:bg-neutral-800/50">
+            <td class="py-3 px-4">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">#${escapeHtml(u.empId)}</span>
+                <span class="font-semibold text-slate-900 dark:text-white">${escapeHtml(u.name)}</span>
+                ${u.noLeaveBalance ? '<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 dark:bg-neutral-700 text-slate-700 dark:text-neutral-200">Access Only</span>' : ''}
+              </div>
+            </td>
+            <td class="py-3 px-3 font-mono text-xs text-slate-700 dark:text-neutral-300">${escapeHtml(u.email)}</td>
+            <td class="py-3 px-3 text-xs">
+              <div class="font-semibold text-slate-800 dark:text-neutral-200">${escapeHtml(u.lob)}</div>
+              <div class="text-slate-500 dark:text-neutral-400">${u.supervisor ? escapeHtml(u.supervisor) : 'No Supervisor'}</div>
+            </td>
+            <td class="py-3 px-3">${statusBadge}</td>
+            <td class="py-3 px-3">
+              <select onchange="updateUserAccessRole('${u.id}', this.value)"
+                class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-800 dark:text-neutral-100">
+                <option value="agent" ${u.role === 'agent' ? 'selected' : ''}>Agent</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+              </select>
+            </td>
+            <td class="py-3 px-4 text-right">
+              <button type="button" onclick="resetUserPasswordToFirstLogin('${u.id}')"
+                class="px-3 py-1.5 text-xs font-semibold text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-lg transition">
+                Reset to 1st Login
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateUserAccessRole(userId, newRole) {
+      const user = agents.find(a => a.id === userId);
+      if (!user) return;
+      user.role = newRole;
+      saveAgentsToStorage();
+      renderDashboard();
+      showToast(`Updated ${user.name}'s access role to ${newRole.toUpperCase()}.`);
+    }
+
+    function resetUserPasswordToFirstLogin(userId) {
+      const user = agents.find(a => a.id === userId);
+      if (!user) return;
+      user.customPassword = null;
+      saveAgentsToStorage();
+      renderManageUsersTable();
+      showToast(`${user.name} reset to 1st-time password setup.`);
+    }
+
+    // =========================================================================
+    // 8. MODALS, EXPORT & GOOGLE SHEETS SYNC
     // =========================================================================
     function openChangeOwnPasswordModal() {
       document.getElementById('own-new-pwd').value = '';
@@ -2509,84 +2437,125 @@
     }
 
     function handleAgentSelfPasswordChange(event) {
-      event.preventDefault();
-      if (!currentSessionUser) return;
+      if (event) event.preventDefault();
       const p1 = document.getElementById('own-new-pwd').value;
       const p2 = document.getElementById('own-confirm-pwd').value;
-      const errEl = document.getElementById('own-pwd-error');
-      if (p1.length < 6) {
-        errEl.textContent = 'Password must be at least 6 characters.';
-        errEl.classList.remove('hidden');
+      const err = document.getElementById('own-pwd-error');
+
+      if (!p1 || p1.length < 6) {
+        err.textContent = 'Password must be at least 6 characters.';
+        err.classList.remove('hidden');
         return;
       }
       if (p1 !== p2) {
-        errEl.textContent = 'Passwords do not match.';
-        errEl.classList.remove('hidden');
+        err.textContent = 'Passwords do not match.';
+        err.classList.remove('hidden');
         return;
       }
-      currentSessionUser.customPassword = p1;
-      saveAgents();
+      if (currentSessionUser) {
+        currentSessionUser.customPassword = p1;
+        saveAgentsToStorage();
+      }
       closeChangeOwnPasswordModal();
-      showToast('Password updated successfully!');
+      showToast('Your sign-in password has been updated.');
     }
 
-    function openScheduleModal(year = '2026') {
+    function openScheduleModal(tab = '2026') {
       document.getElementById('schedule-modal').classList.remove('hidden');
-      switchScheduleTab(year);
+      switchScheduleTab(tab);
     }
 
     function closeScheduleModal() {
       document.getElementById('schedule-modal').classList.add('hidden');
     }
 
-    function switchScheduleTab(year) {
-      const y = String(year);
+    function switchScheduleTab(tab) {
+      currentScheduleTab = tab;
       const t26 = document.getElementById('sched-tab-2026');
       const t27 = document.getElementById('sched-tab-2027');
-      if (t26 && t27) {
-        t26.className = y === '2026'
-          ? 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-blue-800 text-white bg-blue-900 transition'
-          : 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition';
-        t27.className = y === '2027'
-          ? 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-blue-800 text-white bg-blue-900 transition'
-          : 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition';
-      }
+      const act = 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-blue-800 text-white bg-blue-900 transition';
+      const inact = 'px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition';
+      if (t26) t26.className = tab === '2026' ? act : inact;
+      if (t27) t27.className = tab === '2027' ? act : inact;
 
-      setText('schedule-total-label', `Total ${y}`);
-      const milestones = getCycleMilestones(Number(y));
+      const months = ['1-Feb', '1-Mar', '1-Apr', '1-May', '1-Jun', '1-Jul', '1-Aug', '1-Sep', '1-Oct', '1-Nov', '1-Dec', '1-Jan'];
+      const yr = tab === '2027' ? '27' : '26';
+      const nextYr = tab === '2027' ? '28' : '27';
       const tbody = document.getElementById('schedule-reference-tbody');
       if (tbody) {
-        tbody.innerHTML = milestones.map(ms => `
+        tbody.innerHTML = months.map((m, i) => `
           <tr>
-            <td class="py-2 px-4 font-semibold text-neutral-900 dark:text-white">${ms.label}</td>
-            <td class="py-2 px-3 text-center text-blue-600 dark:text-blue-400 font-semibold">1.25</td>
-            <td class="py-2 px-3 text-center text-emerald-600 dark:text-emerald-400 font-semibold">1.75</td>
-            <td class="py-2 px-4 text-center text-purple-600 dark:text-purple-400 font-semibold">2.50</td>
+            <td class="py-2 px-4 font-semibold">By ${m}-${i === 11 ? nextYr : yr}</td>
+            <td class="py-2 px-3 text-center">1.25</td>
+            <td class="py-2 px-3 text-center">1.75</td>
+            <td class="py-2 px-4 text-center">2.50</td>
           </tr>
         `).join('');
       }
+      const totalLbl = document.getElementById('schedule-total-label');
+      if (totalLbl) totalLbl.textContent = `Total ${tab}`;
     }
 
     function openAgentModal(agentId = null) {
       const form = document.getElementById('agent-form');
       if (form) form.reset();
-      document.getElementById('agent-id').value = agentId ? String(agentId) : '';
+      document.getElementById('agent-id').value = agentId || '';
+
+      // Ensure Name, ID, LOB, Supervisor fields exist in modal
+      let extraFields = document.getElementById('agent-identity-fields');
+      if (!extraFields && form) {
+        extraFields = document.createElement('div');
+        extraFields.id = 'agent-identity-fields';
+        extraFields.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+        extraFields.innerHTML = `
+          <div>
+            <label for="agent-emp-id" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Employee ID</label>
+            <input type="text" id="agent-emp-id" required placeholder="e.g., 925"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <div>
+            <label for="agent-name-input" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Full Name</label>
+            <input type="text" id="agent-name-input" required placeholder="Agent Full Name"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <div>
+            <label for="agent-lob-input" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">LOB / Department</label>
+            <input type="text" id="agent-lob-input" required placeholder="e.g., MX, Wins, Social"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+          <div>
+            <label for="agent-supervisor-input" class="block text-xs font-semibold text-slate-700 dark:text-neutral-300 uppercase tracking-wider mb-1">Supervisor</label>
+            <input type="text" id="agent-supervisor-input" placeholder="Supervisor Name"
+              class="w-full px-3.5 py-2 text-sm bg-white dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700">
+          </div>
+        `;
+        form.insertBefore(extraFields, form.children[1]);
+      }
+
+      const is2027 = activePreset === 'cycle_2027';
+      document.getElementById('modal-annual-label').textContent = `Annual Taken (${is2027 ? '2027' : '2026'})`;
+      document.getElementById('modal-casual-label').textContent = `Casual Taken (${is2027 ? '2027' : '2026'})`;
 
       if (agentId) {
         const a = agents.find(x => x.id === agentId);
-        if (!a) return;
-        setText('modal-title', `Edit ${a.name} (#${a.empId})`);
-        document.getElementById('agent-join-date').value = a.joinDate;
-        document.getElementById('agent-used').value = a.usedDays || 0;
-        document.getElementById('agent-casual-used').value = a.casualUsedDays || 0;
-        document.getElementById('agent-login-user').value = a.email || '';
-        document.getElementById('agent-access-role').value = a.accessRole || 'agent';
-        document.getElementById('agent-login-pass').value = a.customPassword || 'Tempo@123';
-        document.getElementById('agent-exceptional').checked = Boolean(a.isExceptional);
+        if (a) {
+          document.getElementById('modal-title').textContent = `Edit ${a.name} (#${a.empId})`;
+          document.getElementById('agent-emp-id').value = a.empId;
+          document.getElementById('agent-name-input').value = a.name;
+          document.getElementById('agent-lob-input').value = a.lob;
+          document.getElementById('agent-supervisor-input').value = a.supervisor || '';
+          document.getElementById('agent-join-date').value = a.joinDate;
+          document.getElementById('agent-used').value = is2027 ? (a.usedDays2027 || 0) : (a.usedDays || 0);
+          document.getElementById('agent-casual-used').value = is2027 ? (a.casualUsedDays2027 || 0) : (a.casualUsedDays || 0);
+          document.getElementById('agent-login-user').value = a.email;
+          document.getElementById('agent-access-role').value = a.role || 'agent';
+          document.getElementById('agent-login-pass').value = a.customPassword || DEFAULT_USER_PASS;
+          document.getElementById('agent-exceptional').checked = Boolean(a.exceptional);
+        }
       } else {
-        setText('modal-title', 'Add Team Agent');
+        document.getElementById('modal-title').textContent = 'Add Team Agent';
         document.getElementById('agent-join-date').value = '2026-11-01';
-        document.getElementById('agent-login-pass').value = 'Tempo@123';
+        document.getElementById('agent-login-pass').value = DEFAULT_USER_PASS;
       }
 
       document.getElementById('agent-modal').classList.remove('hidden');
@@ -2597,88 +2566,100 @@
     }
 
     function saveAgent(event) {
-      event.preventDefault();
-      const idVal = document.getElementById('agent-id').value;
+      if (event) event.preventDefault();
+      const id = document.getElementById('agent-id').value;
+      const empId = document.getElementById('agent-emp-id').value.trim();
+      const name = document.getElementById('agent-name-input').value.trim();
+      const lob = document.getElementById('agent-lob-input').value.trim();
+      const supervisor = document.getElementById('agent-supervisor-input').value.trim();
       const joinDate = document.getElementById('agent-join-date').value;
-      const usedDays = Math.max(0, Number(document.getElementById('agent-used').value || 0));
-      const casualUsedDays = Math.max(0, Number(document.getElementById('agent-casual-used').value || 0));
+      const annualVal = Math.max(0, Number(document.getElementById('agent-used').value || 0));
+      const casualVal = Math.max(0, Number(document.getElementById('agent-casual-used').value || 0));
       const email = document.getElementById('agent-login-user').value.trim().toLowerCase();
-      const accessRole = document.getElementById('agent-access-role').value;
-      const passVal = document.getElementById('agent-login-pass').value.trim();
-      const isExceptional = document.getElementById('agent-exceptional').checked;
+      const role = document.getElementById('agent-access-role').value;
+      const pwd = document.getElementById('agent-login-pass').value.trim();
+      const exceptional = document.getElementById('agent-exceptional').checked;
+      const is2027 = activePreset === 'cycle_2027';
 
-      if (idVal) {
-        const existing = agents.find(a => a.id === Number(idVal));
-        if (existing) {
-          existing.joinDate = joinDate;
-          existing.usedDays = usedDays;
-          existing.casualUsedDays = casualUsedDays;
-          existing.email = email;
-          existing.accessRole = accessRole;
-          existing.customPassword = passVal === 'Tempo@123' ? '' : passVal;
-          existing.isExceptional = isExceptional;
+      if (id) {
+        const a = agents.find(x => x.id === id);
+        if (a) {
+          a.empId = empId;
+          a.name = name;
+          a.lob = lob;
+          a.supervisor = supervisor;
+          a.joinDate = joinDate;
+          if (is2027) {
+            a.usedDays2027 = annualVal;
+            a.casualUsedDays2027 = casualVal;
+          } else {
+            a.usedDays = annualVal;
+            a.casualUsedDays = casualVal;
+          }
+          a.email = email;
+          a.role = role;
+          a.customPassword = (!pwd || pwd === DEFAULT_USER_PASS) ? null : pwd;
+          a.exceptional = exceptional;
         }
-        showToast('Agent updated successfully');
+        showToast(`Updated ${name}.`);
       } else {
-        const nextId = agents.reduce((m, a) => Math.max(m, a.id), 0) + 1;
-        const nameFromEmail = email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
         agents.push({
-          id: nextId,
-          empId: String(923 + nextId),
-          name: nameFromEmail || 'New Agent',
+          id: `agent_${Date.now()}`,
+          empId,
+          name,
           email,
-          dept: 'MX',
-          supervisor: 'Lina Hesham',
+          emailAliases: [],
+          lob,
+          supervisor,
           joinDate,
-          usedDays,
-          casualUsedDays,
-          usedDays2027: 0,
-          casualUsedDays2027: 0,
+          usedDays: is2027 ? 0 : annualVal,
+          casualUsedDays: is2027 ? 0 : casualVal,
+          usedDays2027: is2027 ? annualVal : 0,
+          casualUsedDays2027: is2027 ? casualVal : 0,
           monthlyUsed: {},
           monthlyCasualUsed: {},
-          isExceptional,
-          accessRole,
+          exceptional,
+          role,
           noLeaveBalance: false,
-          customPassword: passVal === 'Tempo@123' ? '' : passVal,
-          tenureGroup: 'New'
+          customPassword: (!pwd || pwd === DEFAULT_USER_PASS) ? null : pwd
         });
-        showToast('New agent added to roster');
+        showToast(`Added ${name} to the roster.`);
       }
 
-      saveAgents();
+      saveAgentsToStorage();
       populateDynamicFilters();
       closeAgentModal();
       renderDashboard();
     }
 
     function confirmDeleteAgent(agentId) {
-      const agent = agents.find(a => a.id === agentId);
-      if (!agent) return;
-      setText('confirm-title', 'Remove Team Member');
-      setText('confirm-message', `Are you sure you want to remove ${agent.name} (#${agent.empId}) from the roster?`);
+      const a = agents.find(x => x.id === agentId);
+      if (!a) return;
+      document.getElementById('confirm-title').textContent = `Remove ${a.name}?`;
+      document.getElementById('confirm-message').textContent = `This will remove #${a.empId} (${a.name}) from the leave roster.`;
       const btn = document.getElementById('confirm-action-btn');
       btn.onclick = () => {
-        agents = agents.filter(a => a.id !== agentId);
-        saveAgents();
+        agents = agents.filter(x => x.id !== agentId);
+        saveAgentsToStorage();
         populateDynamicFilters();
         closeConfirmModal();
         renderDashboard();
-        showToast(`Removed ${agent.name}`);
+        showToast(`Removed ${a.name}.`);
       };
       document.getElementById('confirm-modal').classList.remove('hidden');
     }
 
     function openResetConfirm() {
-      setText('confirm-title', 'Reset to Default Roster');
-      setText('confirm-message', 'Restore all default hiring dates, supervisors, LOBs, and taken balances?');
+      document.getElementById('confirm-title').textContent = 'Reset to Default Roster?';
+      document.getElementById('confirm-message').textContent = 'Restores the default team roster, joining dates, and initial leave balances.';
       const btn = document.getElementById('confirm-action-btn');
       btn.onclick = () => {
-        agents = getDefaultAgents();
-        saveAgents();
+        localStorage.removeItem(STORAGE_KEY);
+        agents = loadAgents();
         populateDynamicFilters();
         closeConfirmModal();
         renderDashboard();
-        showToast('Roster reset to defaults');
+        showToast('Roster reset to default values.');
       };
       document.getElementById('confirm-modal').classList.remove('hidden');
     }
@@ -2688,38 +2669,61 @@
     }
 
     function openBreakdownModal(agentId) {
+      activeBreakdownAgentId = agentId;
       const agent = agents.find(a => a.id === agentId);
       if (!agent) return;
       const calc = calculateAgentLeave(agent, getReferenceDate());
 
-      setText('breakdown-title', `${agent.name} (#${agent.empId}) — Milestone Ledger`);
-      setText('breakdown-subtitle', `${agent.dept} • Hired ${formatDisplayDate(calc.joinDate)} • ${calc.cycleYear} Cycle`);
+      document.getElementById('breakdown-title').textContent = `${agent.name} (#${agent.empId}) — Milestone Ledger`;
+      document.getElementById('breakdown-subtitle').textContent = `Hired ${formatDisplayDate(calc.joinDate)} • ${agent.lob} • Rate: ${calc.tierShort}`;
 
-      const summaryEl = document.getElementById('breakdown-summary');
-      if (summaryEl) {
-        summaryEl.innerHTML = `
-          <div><span class="text-neutral-500 block">Accrued to Date</span><strong class="text-blue-600 dark:text-blue-400 text-sm">${formatNum(calc.accruedToDate)}</strong></div>
-          <div><span class="text-neutral-500 block">Annual Taken</span><strong class="text-amber-600 dark:text-amber-400 text-sm">${formatNum(calc.annualTaken)}</strong></div>
-          <div><span class="text-neutral-500 block">Casual Taken</span><strong class="text-rose-600 dark:text-rose-400 text-sm">${formatNum(calc.casualTaken)}</strong></div>
-          <div><span class="text-neutral-500 block">Remaining</span><strong class="text-emerald-600 dark:text-emerald-400 text-sm">${formatNum(calc.remainingBalance)}</strong></div>
-        `;
-      }
+      document.getElementById('breakdown-summary').innerHTML = `
+        <div><span class="text-neutral-500 block">Accrued to Date</span><strong class="text-blue-600 dark:text-blue-400 text-sm">${formatNum(calc.accruedToDate)}</strong></div>
+        <div><span class="text-neutral-500 block">Annual Taken</span><strong class="text-amber-600 dark:text-amber-400 text-sm">${formatNum(calc.annualTaken)}</strong></div>
+        <div><span class="text-neutral-500 block">Casual Taken</span><strong class="text-rose-600 dark:text-rose-400 text-sm">${formatNum(calc.casualTaken)}</strong></div>
+        <div><span class="text-neutral-500 block">Remaining Balance</span><strong class="text-emerald-600 dark:text-emerald-400 text-sm">${formatNum(calc.availableBalance)}</strong></div>
+      `;
 
-      const tbody = document.getElementById('breakdown-tbody');
-      if (tbody) {
-        tbody.innerHTML = calc.ledger.map(row => `
-          <tr class="${row.isReached ? '' : 'opacity-60'}">
-            <td class="py-2 px-3 font-semibold text-neutral-900 dark:text-white">${row.label}</td>
-            <td class="py-2 px-3 text-xs text-neutral-600 dark:text-neutral-300">${row.tierLabel}</td>
-            <td class="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">+${formatNum(row.rate)}</td>
-            <td class="py-2 px-3 text-center text-amber-600 dark:text-amber-400">${formatNum(row.annualTaken)}</td>
-            <td class="py-2 px-3 text-center text-rose-600 dark:text-rose-400">${formatNum(row.casualTaken)}</td>
-            <td class="py-2 px-3 text-right font-bold text-neutral-900 dark:text-white">${formatNum(row.cumulativeAccrued)}</td>
+      let cum = 0;
+      document.getElementById('breakdown-tbody').innerHTML = calc.schedule.map(m => {
+        cum += m.earned;
+        return `
+          <tr class="${m.passed ? '' : 'opacity-65'}">
+            <td class="py-2 px-3 font-medium">${m.label}</td>
+            <td class="py-2 px-3 text-xs text-neutral-500">${m.tier}</td>
+            <td class="py-2 px-3 text-right font-semibold text-blue-600 dark:text-blue-400">+${formatNum(m.earned)}</td>
+            <td class="py-2 px-3 text-center">
+              <input type="number" step="0.25" min="0" value="${m.used}"
+                onchange="updateMonthlyItemized('${agent.id}', '${m.key}', 'annual', this.value)"
+                class="w-16 text-center px-1.5 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+            </td>
+            <td class="py-2 px-3 text-center">
+              <input type="number" step="0.25" min="0" value="${m.casualUsed}"
+                onchange="updateMonthlyItemized('${agent.id}', '${m.key}', 'casual', this.value)"
+                class="w-16 text-center px-1.5 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+            </td>
+            <td class="py-2 px-3 text-right font-bold">${formatNum(cum)}</td>
           </tr>
-        `).join('');
-      }
+        `;
+      }).join('');
 
       document.getElementById('breakdown-modal').classList.remove('hidden');
+    }
+
+    function updateMonthlyItemized(agentId, monthKey, kind, val) {
+      const a = agents.find(x => x.id === agentId);
+      if (!a) return;
+      const num = Math.max(0, Number(val || 0));
+      if (kind === 'annual') {
+        if (!a.monthlyUsed) a.monthlyUsed = {};
+        a.monthlyUsed[monthKey] = num;
+      } else {
+        if (!a.monthlyCasualUsed) a.monthlyCasualUsed = {};
+        a.monthlyCasualUsed[monthKey] = num;
+      }
+      saveAgentsToStorage();
+      renderDashboard();
+      openBreakdownModal(agentId);
     }
 
     function closeBreakdownModal() {
@@ -2727,15 +2731,15 @@
     }
 
     function toggleExportMenu(event) {
-      event.stopPropagation();
-      document.getElementById('export-menu').classList.toggle('hidden');
+      if (event) event.stopPropagation();
+      document.getElementById('export-menu')?.classList.toggle('hidden');
     }
 
     function closeExportMenu() {
       document.getElementById('export-menu')?.classList.add('hidden');
     }
 
-    document.addEventListener('click', () => closeExportMenu());
+    document.addEventListener('click', closeExportMenu);
 
     function downloadCSVFile(filename, rows) {
       const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -2749,44 +2753,41 @@
     }
 
     function exportSummaryCSV() {
-      const refDate = getReferenceDate();
-      const rows = [['ID', 'Name', 'Email', 'LOB', 'Supervisor', 'Hiring Date', 'Rate', 'Accrued', 'Annual Taken', 'Casual Taken', 'Total Deducted', 'Remaining']];
-      agents.filter(a => !a.noLeaveBalance).forEach(a => {
-        const c = calculateAgentLeave(a, refDate);
-        rows.push([a.empId, a.name, a.email, a.dept, a.supervisor, a.joinDate, c.currentRate, c.accruedToDate, c.annualTaken, c.casualTaken, c.totalDeducted, c.remainingBalance]);
+      const ref = getReferenceDate();
+      const header = ['ID', 'Name', 'Email', 'LOB', 'Supervisor', 'Hiring Date', 'Rate', 'Accrued', 'Annual Taken', 'Casual Taken', 'Total Deducted', 'Remaining'];
+      const rows = agents.filter(a => !a.noLeaveBalance).map(a => {
+        const c = calculateAgentLeave(a, ref);
+        return [a.empId, a.name, a.email, a.lob, a.supervisor, a.joinDate, c.currentRate, c.accruedToDate, c.annualTaken, c.casualTaken, c.totalDeducted, c.availableBalance];
       });
-      downloadCSVFile('tempo_leave_summary.csv', rows);
-      showToast('Summary CSV exported');
+      downloadCSVFile('tempo_leave_summary.csv', [header, ...rows]);
+      showToast('Exported Summary CSV.');
     }
 
     function exportDetailedLedgerCSV() {
-      const refDate = getReferenceDate();
-      const rows = [['ID', 'Name', 'Milestone', 'Tier', 'Accrued', 'Annual Taken', 'Casual Taken']];
+      const ref = getReferenceDate();
+      const header = ['ID', 'Name', 'LOB', 'Milestone', 'Earned', 'Annual Taken', 'Casual Taken'];
+      const rows = [];
       agents.filter(a => !a.noLeaveBalance).forEach(a => {
-        const c = calculateAgentLeave(a, refDate);
-        c.ledger.forEach(m => {
-          rows.push([a.empId, a.name, m.label, m.tierLabel, m.rate, m.annualTaken, m.casualTaken]);
-        });
+        const c = calculateAgentLeave(a, ref);
+        c.schedule.forEach(m => rows.push([a.empId, a.name, a.lob, m.label, m.earned, m.used, m.casualUsed]));
       });
-      downloadCSVFile('tempo_milestone_ledger.csv', rows);
-      showToast('Milestone Ledger CSV exported');
+      downloadCSVFile('tempo_milestone_ledger.csv', [header, ...rows]);
+      showToast('Exported Milestone Ledger CSV.');
     }
 
     function exportCredentialsCSV() {
-      const rows = [['ID', 'Name', 'Email', 'Access Role', 'Password Status']];
-      agents.forEach(a => {
-        rows.push([a.empId, a.name, a.email, a.accessRole, a.customPassword ? 'Password Active' : '1st-Time Setup Pending']);
-      });
-      downloadCSVFile('tempo_user_credentials.csv', rows);
-      showToast('Agent Emails & Status CSV exported');
+      const header = ['ID', 'Name', 'Work Email', 'Role', 'Password Status'];
+      const rows = agents.map(a => [a.empId, a.name, a.email, a.role, isFirstTimeUser(a) ? '1st-Time Setup Pending' : 'Password Active']);
+      downloadCSVFile('tempo_user_emails.csv', [header, ...rows]);
+      showToast('Exported Agent Emails & Status CSV.');
     }
 
     function copyForGoogleSheets() {
-      const refDate = getReferenceDate();
+      const ref = getReferenceDate();
       const lines = [['ID', 'Name', 'LOB', 'Supervisor', 'Hiring Date', 'Accrued', 'Annual Taken', 'Casual Taken', 'Remaining'].join('\t')];
       agents.filter(a => !a.noLeaveBalance).forEach(a => {
-        const c = calculateAgentLeave(a, refDate);
-        lines.push([a.empId, a.name, a.dept, a.supervisor, a.joinDate, c.accruedToDate, c.annualTaken, c.casualTaken, c.remainingBalance].join('\t'));
+        const c = calculateAgentLeave(a, ref);
+        lines.push([a.empId, a.name, a.lob, a.supervisor, formatDisplayDate(c.joinDate), formatNum(c.accruedToDate), formatNum(c.annualTaken), formatNum(c.casualTaken), formatNum(c.availableBalance)].join('\t'));
       });
       const ta = document.createElement('textarea');
       ta.value = lines.join('\n');
@@ -2794,7 +2795,7 @@
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      showToast('Copied table for Google Sheets (Ctrl+V)');
+      showToast('Copied table for Google Sheets (Ctrl+V to paste).');
     }
 
     function openSheetsModal() {
@@ -2806,120 +2807,137 @@
     }
 
     function downloadConsumedTemplateCSV() {
-      const rows = [['ID', 'Name', 'Annual Taken', 'Casual Taken']];
-      agents.filter(a => !a.noLeaveBalance).forEach(a => {
-        rows.push([a.empId, a.name, a.usedDays || 0, a.casualUsedDays || 0]);
-      });
-      downloadCSVFile('tempo_consumed_template.csv', rows);
+      const header = ['ID', 'Name', 'Annual Taken', 'Casual Taken'];
+      const rows = agents.filter(a => !a.noLeaveBalance).map(a => [a.empId, a.name, a.usedDays || 0, a.casualUsedDays || 0]);
+      downloadCSVFile('tempo_sheets_template.csv', [header, ...rows]);
     }
 
     function handleCSVFileUpload(event) {
-      const file = event.target.files && event.target.files[0];
+      const file = event.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = e => {
-        document.getElementById('gsheet-paste-area').value = e.target.result || '';
+        document.getElementById('gsheet-paste-area').value = e.target?.result || '';
         previewPastedSheetData();
       };
       reader.readAsText(file);
     }
 
     async function fetchFromGoogleSheetURL() {
-      const rawUrl = (document.getElementById('gsheet-url-input')?.value || '').trim();
-      const match = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const urlInput = document.getElementById('gsheet-url-input')?.value.trim();
+      const match = urlInput?.match(/\/d\/([a-zA-Z0-9-_]+)/);
       if (!match) {
-        showToast('Enter a valid Google Sheets URL', 'error');
+        showToast('Please enter a valid Google Sheets URL.', true);
         return;
       }
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
       try {
-        const res = await fetch(csvUrl);
-        if (!res.ok) throw new Error('Sheet fetch failed');
-        const text = await res.text();
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+        const resp = await fetch(csvUrl);
+        if (!resp.ok) throw new Error('Fetch failed');
+        const text = await resp.text();
         document.getElementById('gsheet-paste-area').value = text;
         previewPastedSheetData();
-        showToast('Google Sheet fetched');
-      } catch (err) {
-        showToast('Could not fetch sheet (ensure link is public)', 'error');
+        showToast('Fetched sheet data successfully.');
+      } catch (e) {
+        showToast('Could not fetch sheet directly. Copy & paste cells into Option B.', true);
       }
     }
 
     function previewPastedSheetData() {
       const raw = (document.getElementById('gsheet-paste-area')?.value || '').trim();
-      const box = document.getElementById('gsheet-preview-box');
+      const previewBox = document.getElementById('gsheet-preview-box');
       const applyBtn = document.getElementById('gsheet-apply-btn');
       parsedSheetRows = [];
 
       if (!raw) {
-        box.classList.add('hidden');
-        applyBtn.disabled = true;
+        previewBox?.classList.add('hidden');
+        if (applyBtn) applyBtn.disabled = true;
         return;
       }
 
-      const lines = raw.split(/\r?\n/).filter(Boolean);
-      const sep = lines[0].includes('\t') ? '\t' : ',';
-      const headers = lines[0].split(sep).map(h => h.trim().toLowerCase());
+      const sep = raw.includes('\t') ? '\t' : ',';
+      const lines = raw.split(/\r?\n/).map(l => l.split(sep).map(c => c.trim().replace(/^"|"$/g, '')));
+      if (lines.length < 2) return;
+
+      const headers = lines[0].map(h => h.toLowerCase());
       const idIdx = headers.findIndex(h => h === 'id' || h.includes('emp'));
       const nameIdx = headers.findIndex(h => h.includes('name'));
       const annualIdx = headers.findIndex(h => h.includes('annual') || h.includes('taken'));
       const casualIdx = headers.findIndex(h => h.includes('casual'));
 
       for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(sep).map(c => c.trim());
-        const empId = idIdx >= 0 ? cols[idIdx] : '';
-        const name = nameIdx >= 0 ? cols[nameIdx] : '';
-        const annual = annualIdx >= 0 ? Number(cols[annualIdx] || 0) : 0;
-        const casual = casualIdx >= 0 ? Number(cols[casualIdx] || 0) : 0;
-        if (empId || name) {
-          parsedSheetRows.push({ empId, name, annual, casual });
+        const row = lines[i];
+        if (!row.length) continue;
+        const empId = idIdx >= 0 ? row[idIdx] : '';
+        const name = nameIdx >= 0 ? row[nameIdx] : '';
+        const matched = agents.find(a => (empId && String(a.empId) === String(empId)) || (name && a.name.toLowerCase() === name.toLowerCase()));
+        if (matched) {
+          parsedSheetRows.push({
+            agent: matched,
+            annual: annualIdx >= 0 ? Number(row[annualIdx] || 0) : 0,
+            casual: casualIdx >= 0 ? Number(row[casualIdx] || 0) : 0
+          });
         }
       }
 
-      setText('gsheet-preview-summary', `${parsedSheetRows.length} rows detected`);
-      const thead = document.getElementById('gsheet-preview-thead');
-      const tbody = document.getElementById('gsheet-preview-tbody');
-      thead.innerHTML = '<tr><th class="py-2 px-3">ID</th><th class="py-2 px-3">Name</th><th class="py-2 px-3 text-right">Annual</th><th class="py-2 px-3 text-right">Casual</th></tr>';
-      tbody.innerHTML = parsedSheetRows.slice(0, 15).map(r => `
-        <tr><td class="py-1.5 px-3 font-mono">${escapeHtml(r.empId)}</td><td class="py-1.5 px-3">${escapeHtml(r.name)}</td><td class="py-1.5 px-3 text-right">${r.annual}</td><td class="py-1.5 px-3 text-right">${r.casual}</td></tr>
-      `).join('');
+      document.getElementById('gsheet-preview-summary').textContent = `${parsedSheetRows.length} matched team members detected`;
+      document.getElementById('gsheet-preview-thead').innerHTML = '<tr><th class="py-1.5 px-3">ID</th><th class="py-1.5 px-3">Name</th><th class="py-1.5 px-3 text-right">Annual</th><th class="py-1.5 px-3 text-right">Casual</th></tr>';
+      document.getElementById('gsheet-preview-tbody').innerHTML = parsedSheetRows.slice(0, 15).map(r =>
+        `<tr><td class="py-1.5 px-3 font-mono">#${escapeHtml(r.agent.empId)}</td><td class="py-1.5 px-3">${escapeHtml(r.agent.name)}</td><td class="py-1.5 px-3 text-right">${r.annual}</td><td class="py-1.5 px-3 text-right">${r.casual}</td></tr>`
+      ).join('');
 
-      box.classList.remove('hidden');
-      applyBtn.disabled = parsedSheetRows.length === 0;
+      previewBox?.classList.remove('hidden');
+      if (applyBtn) applyBtn.disabled = parsedSheetRows.length === 0;
     }
 
     function applyGoogleSheetsImport() {
       const mode = document.querySelector('input[name="sync-mode"]:checked')?.value || 'overwrite';
-      let updated = 0;
-      parsedSheetRows.forEach(row => {
-        const match = agents.find(a =>
-          (row.empId && String(a.empId) === String(row.empId)) ||
-          (row.name && a.name.toLowerCase() === row.name.toLowerCase())
-        );
-        if (match) {
-          if (mode === 'add') {
-            match.usedDays = Number(((match.usedDays || 0) + row.annual).toFixed(2));
-            match.casualUsedDays = Number(((match.casualUsedDays || 0) + row.casual).toFixed(2));
-          } else {
-            match.usedDays = Number(row.annual.toFixed(2));
-            match.casualUsedDays = Number(row.casual.toFixed(2));
-          }
-          updated++;
+      const is2027 = activePreset === 'cycle_2027';
+
+      parsedSheetRows.forEach(({ agent, annual, casual }) => {
+        if (is2027) {
+          agent.usedDays2027 = mode === 'add' ? Number(agent.usedDays2027 || 0) + annual : annual;
+          agent.casualUsedDays2027 = mode === 'add' ? Number(agent.casualUsedDays2027 || 0) + casual : casual;
+        } else {
+          agent.usedDays = mode === 'add' ? Number(agent.usedDays || 0) + annual : annual;
+          agent.casualUsedDays = mode === 'add' ? Number(agent.casualUsedDays || 0) + casual : casual;
         }
       });
-      saveAgents();
-      renderDashboard();
+
+      saveAgentsToStorage();
       closeSheetsModal();
-      showToast(`Synced ${updated} team members`);
+      renderDashboard();
+      showToast(`Synced ${parsedSheetRows.length} records from sheet.`);
     }
 
     // =========================================================================
-    // 8. INITIALIZATION ON WINDOW LOAD
+    // 9. INITIALIZATION ON WINDOW LOAD
     // =========================================================================
     window.addEventListener('DOMContentLoaded', () => {
       initTheme();
       agents = loadAgents();
       populateDynamicFilters();
-      checkAgentFirstTimeEmailStatus();
+
+      // Restore previous signed-in session across page refreshes
+      let restoredUser = null;
+      try {
+        const savedSessionRaw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedSessionRaw) {
+          const savedSession = JSON.parse(savedSessionRaw);
+          if (savedSession && savedSession.empId) {
+            restoredUser = agents.find(a => String(a.empId) === String(savedSession.empId)) || null;
+          }
+          if (!restoredUser && savedSession && savedSession.email) {
+            restoredUser = findUserByEmail(savedSession.email);
+          }
+        }
+      } catch (e) {}
+
+      if (restoredUser) {
+        completeSignInSession(restoredUser);
+      } else {
+        checkAgentFirstTimeEmailStatus();
+      }
     });
   </script>
 </body>
