@@ -41,58 +41,51 @@
 
   <!-- Top Navigation Bar -->
   <header class="bg-white dark:bg-neutral-900 border-b border-slate-200 dark:border-neutral-800 sticky top-0 z-30 transition-colors duration-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shadow-sm">
+    <div class="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shadow-sm shrink-0">
           <i class="fa-solid fa-calendar-check text-lg"></i>
         </div>
-        <div>
+        <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-xl font-bold text-slate-900 dark:text-white leading-tight">Tempo Annual Leave Tracker</h1>
-            <span id="role-mode-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700">
+            <h1 class="text-base sm:text-xl font-bold text-slate-900 dark:text-white leading-tight truncate">Tempo Annual Leave Tracker</h1>
+            <span id="role-mode-badge" class="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 shrink-0">
               <i class="fa-solid fa-lock text-[9px]"></i>
               <span id="role-mode-text">Sign In Required</span>
             </span>
           </div>
-          <p id="header-subtitle" class="text-xs text-slate-500 dark:text-neutral-400 hidden sm:block">Email-Authenticated Leave Balance Portal</p>
+          <p id="header-subtitle" class="text-xs text-slate-500 dark:text-neutral-400 hidden sm:block truncate">Email-Authenticated Leave Balance Portal</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 sm:gap-2.5">
-        <!-- 2026 & 2027 Payout Schedule Reference Modal Trigger (Admin Only) -->
-        <button id="schedules-header-btn" onclick="openScheduleModal('2026')" class="hidden inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm" title="View Fixed 2026 &amp; 2027 Payout Schedules">
-          <i class="fa-solid fa-table-cells text-blue-200"></i>
-          <span class="hidden md:inline">Schedules (2026 / 2027)</span>
-        </button>
-
-        <!-- Light / Dark Mode Toggle -->
-        <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Light / Dark Mode"
-          class="inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-amber-400 border border-slate-200 dark:border-neutral-700 hover:bg-slate-200 dark:hover:bg-neutral-700 transition shadow-sm">
-          <i id="theme-toggle-icon" class="fa-solid fa-moon text-sm"></i>
-        </button>
-
+      <div class="flex items-center gap-3 sm:gap-3.5 shrink-0">
         <!-- Admin-Only Toolbar Group -->
-        <div id="admin-header-controls" class="hidden flex items-center gap-2 sm:gap-2.5">
+        <div id="admin-header-controls" class="hidden flex items-center gap-3">
+          <!-- 2026 & 2027 Accrual Rules Reference Modal Trigger -->
+          <button id="schedules-header-btn" onclick="openScheduleModal('2026')" class="hidden h-10 px-3.5 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm whitespace-nowrap" title="View Fixed 2026 &amp; 2027 Accrual Rules">
+            <i class="fa-solid fa-table-cells text-blue-200 text-xs"></i>
+            <span class="hidden lg:inline">Accrual Rules</span>
+          </button>
+
           <!-- Import from Google Sheets Button -->
-          <button onclick="openSheetsModal()" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
-            <i class="fa-solid fa-table text-blue-200"></i>
-            <span class="hidden sm:inline">Google Sheets Sync</span>
+          <button onclick="openSheetsModal()" class="h-10 px-3.5 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-neutral-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 border border-slate-200 dark:border-neutral-700 rounded-xl transition shadow-sm whitespace-nowrap" title="Sync or Import from Google Sheets">
+            <i class="fa-solid fa-table text-emerald-600 dark:text-emerald-400 text-xs"></i>
+            <span class="hidden md:inline">Sheets Sync</span>
           </button>
 
           <!-- Export Dropdown Menu -->
-          <div class="relative" id="export-dropdown-wrapper">
-            <button onclick="toggleExportMenu(event)" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
-              <i class="fa-solid fa-file-export text-blue-200"></i>
-              <span class="hidden sm:inline">Export</span>
-              <i class="fa-solid fa-chevron-down text-[10px] text-blue-200"></i>
+          <div class="relative">
+            <button type="button" onclick="toggleExportMenu(event)" class="h-10 px-3.5 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-neutral-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 border border-slate-200 dark:border-neutral-700 rounded-xl transition shadow-sm whitespace-nowrap" title="Export Data">
+              <i class="fa-solid fa-file-export text-blue-600 dark:text-blue-400 text-xs"></i>
+              <span class="hidden md:inline">Export</span>
+              <i class="fa-solid fa-chevron-down text-[10px] opacity-70"></i>
             </button>
-
-            <div id="export-menu" class="hidden absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-700 shadow-xl py-1.5 z-40">
+            <div id="export-menu" onclick="event.stopPropagation()" class="hidden absolute right-0 mt-2 w-64 bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200 dark:border-neutral-800 shadow-xl py-1.5 z-50">
               <button onclick="exportSummaryCSV(); closeExportMenu();" class="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-start gap-3 transition">
-                <i class="fa-solid fa-file-csv text-blue-600 dark:text-blue-400 mt-0.5"></i>
+                <i class="fa-solid fa-file-csv text-emerald-600 dark:text-emerald-400 mt-0.5"></i>
                 <div>
                   <div class="text-xs font-semibold text-slate-900 dark:text-neutral-100">Export Summary CSV</div>
-                  <div class="text-[11px] text-slate-500 dark:text-neutral-400">Current filter view for Excel/Sheets</div>
+                  <div class="text-[11px] text-slate-500 dark:text-neutral-400">Current balances &amp; deductions</div>
                 </div>
               </button>
               <button onclick="exportDetailedLedgerCSV(); closeExportMenu();" class="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 flex items-start gap-3 transition">
@@ -120,21 +113,29 @@
             </div>
           </div>
 
-          <!-- Reset Roster Button -->
-          <button onclick="openResetConfirm()" class="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm" title="Reset to Default 49-Agent Roster">
-            <i class="fa-solid fa-rotate-left text-blue-200"></i>
+          <!-- Add Agent Button -->
+          <button onclick="openAgentModal()" class="h-10 px-3.5 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm whitespace-nowrap" title="Add Team Agent">
+            <i class="fa-solid fa-user-plus text-xs"></i>
+            <span class="hidden sm:inline">Add Agent</span>
           </button>
 
-          <!-- Add Agent Button -->
-          <button onclick="openAgentModal()" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm">
-            <i class="fa-solid fa-user-plus"></i>
-            <span class="hidden sm:inline">Add Agent</span>
+          <!-- Reset Roster Button -->
+          <button onclick="openResetConfirm()" class="w-10 h-10 inline-flex items-center justify-center text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 rounded-xl transition shadow-sm shrink-0" title="Reset to Default Roster">
+            <i class="fa-solid fa-rotate-left text-blue-200 text-xs"></i>
           </button>
         </div>
 
+        <div class="h-6 w-px bg-slate-200 dark:bg-neutral-800 hidden sm:block"></div>
+
+        <!-- Light / Dark Mode Toggle -->
+        <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Light / Dark Mode"
+          class="w-10 h-10 inline-flex items-center justify-center rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-amber-400 border border-slate-200 dark:border-neutral-700 hover:bg-slate-200 dark:hover:bg-neutral-700 transition shadow-sm shrink-0">
+          <i id="theme-toggle-icon" class="fa-solid fa-moon text-sm"></i>
+        </button>
+
         <!-- Sign Out Button (Visible when Admin or Agent is signed in) -->
-        <button id="sign-out-btn" onclick="signOutSession()" class="hidden inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-950 hover:bg-blue-900 border border-blue-800 rounded-xl transition shadow-sm">
-          <i class="fa-solid fa-right-from-bracket"></i>
+        <button id="sign-out-btn" onclick="signOutSession()" class="hidden h-10 px-3.5 inline-flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-white bg-blue-950 hover:bg-blue-900 border border-blue-800 rounded-xl transition shadow-sm whitespace-nowrap">
+          <i class="fa-solid fa-right-from-bracket text-xs"></i>
           <span>Sign Out</span>
         </button>
       </div>
